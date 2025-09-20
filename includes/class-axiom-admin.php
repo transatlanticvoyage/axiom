@@ -304,98 +304,107 @@ class Axiom_Admin {
         
         $operation_id = $wpdb->insert_id;
         
-        // Execute the SQL
-        $is_select_query = preg_match('/^(SHOW|DESCRIBE|DESC|SELECT)/i', trim($sql));
+        // Split SQL into multiple statements
+        $statements = array_filter(array_map('trim', explode(';', $sql)), function($stmt) {
+            return !empty($stmt);
+        });
         
-        if ($is_select_query) {
-            // For SELECT-type queries, get results
-            $results = $wpdb->get_results($sql, ARRAY_A);
+        $total_statements = count($statements);
+        $executed_statements = 0;
+        $successful_statements = 0;
+        $failed_statements = 0;
+        $all_results = '';
+        $summary_messages = array();
+        $overall_success = true;
+        
+        foreach ($statements as $index => $statement) {
+            $stmt_num = $index + 1;
+            $all_results .= "=== STATEMENT {$stmt_num} ===\n";
+            $all_results .= "SQL: {$statement}\n\n";
             
-            if ($results !== null) {
-                // Update operation status
-                $wpdb->update(
-                    $wpdb->prefix . 'axiom_operations',
-                    array(
-                        'status' => 'completed',
-                        'completed_at' => current_time('mysql')
-                    ),
-                    array('operation_id' => $operation_id)
-                );
+            $executed_statements++;
+            $is_select_query = preg_match('/^(SHOW|DESCRIBE|DESC|SELECT)/i', trim($statement));
+            
+            if ($is_select_query) {
+                // For SELECT-type queries, get results
+                $results = $wpdb->get_results($statement, ARRAY_A);
                 
-                if ($wpdb->last_error) {
-                    wp_send_json_error('Query executed but with warning: ' . $wpdb->last_error);
-                } else {
-                    // Format results for display
-                    $formatted_results = '';
+                if ($results !== null && !$wpdb->last_error) {
+                    $successful_statements++;
+                    
                     if (!empty($results)) {
-                        // Create a simple table format
+                        // Format results for display
                         $headers = array_keys($results[0]);
-                        $formatted_results .= implode("\t", $headers) . "\n";
-                        $formatted_results .= str_repeat("-", count($headers) * 15) . "\n";
+                        $all_results .= "RESULT: SUCCESS (" . count($results) . " rows returned)\n";
+                        $all_results .= implode("\t", $headers) . "\n";
+                        $all_results .= str_repeat("-", count($headers) * 15) . "\n";
                         
                         foreach ($results as $row) {
-                            $formatted_results .= implode("\t", array_values($row)) . "\n";
+                            $all_results .= implode("\t", array_values($row)) . "\n";
                         }
+                        $summary_messages[] = "Statement {$stmt_num}: SUCCESS - " . count($results) . " rows returned";
                     } else {
-                        $formatted_results = "No results returned.";
+                        $all_results .= "RESULT: SUCCESS (No rows returned)\n";
+                        $summary_messages[] = "Statement {$stmt_num}: SUCCESS - No rows returned";
                     }
-                    
-                    wp_send_json_success(array(
-                        'message' => 'Query executed successfully. ' . count($results) . ' rows returned.',
-                        'results' => $formatted_results
-                    ));
-                }
-            } else {
-                // Update operation status
-                $wpdb->update(
-                    $wpdb->prefix . 'axiom_operations',
-                    array(
-                        'status' => 'failed',
-                        'error_message' => $wpdb->last_error,
-                        'completed_at' => current_time('mysql')
-                    ),
-                    array('operation_id' => $operation_id)
-                );
-                
-                wp_send_json_error('Query execution failed: ' . $wpdb->last_error);
-            }
-        } else {
-            // For non-SELECT queries (ALTER, CREATE, etc.)
-            $result = $wpdb->query($sql);
-            
-            if ($result !== false) {
-                // Update operation status
-                $wpdb->update(
-                    $wpdb->prefix . 'axiom_operations',
-                    array(
-                        'status' => 'completed',
-                        'completed_at' => current_time('mysql')
-                    ),
-                    array('operation_id' => $operation_id)
-                );
-                
-                if ($wpdb->last_error) {
-                    wp_send_json_error('SQL executed but with warning: ' . $wpdb->last_error);
                 } else {
-                    wp_send_json_success(array(
-                        'message' => 'SQL executed successfully. Rows affected: ' . $result,
-                        'results' => null
-                    ));
+                    $failed_statements++;
+                    $overall_success = false;
+                    $error = $wpdb->last_error ?: 'Unknown error';
+                    $all_results .= "RESULT: FAILED - {$error}\n";
+                    $summary_messages[] = "Statement {$stmt_num}: FAILED - {$error}";
                 }
             } else {
-                // Update operation status
-                $wpdb->update(
-                    $wpdb->prefix . 'axiom_operations',
-                    array(
-                        'status' => 'failed',
-                        'error_message' => $wpdb->last_error,
-                        'completed_at' => current_time('mysql')
-                    ),
-                    array('operation_id' => $operation_id)
-                );
+                // For non-SELECT queries (ALTER, CREATE, etc.)
+                $result = $wpdb->query($statement);
                 
-                wp_send_json_error('SQL execution failed: ' . $wpdb->last_error);
+                if ($result !== false && !$wpdb->last_error) {
+                    $successful_statements++;
+                    $all_results .= "RESULT: SUCCESS (Rows affected: {$result})\n";
+                    $summary_messages[] = "Statement {$stmt_num}: SUCCESS - {$result} rows affected";
+                } else {
+                    $failed_statements++;
+                    $overall_success = false;
+                    $error = $wpdb->last_error ?: 'Unknown error';
+                    $all_results .= "RESULT: FAILED - {$error}\n";
+                    $summary_messages[] = "Statement {$stmt_num}: FAILED - {$error}";
+                }
             }
+            
+            $all_results .= "\n" . str_repeat("=", 50) . "\n\n";
+        }
+        
+        // Update operation status based on overall result
+        $final_status = $overall_success ? 'completed' : 'failed';
+        $error_message = $overall_success ? null : 'Some statements failed - see details';
+        
+        $wpdb->update(
+            $wpdb->prefix . 'axiom_operations',
+            array(
+                'status' => $final_status,
+                'error_message' => $error_message,
+                'completed_at' => current_time('mysql')
+            ),
+            array('operation_id' => $operation_id)
+        );
+        
+        // Prepare final response
+        $summary = "Executed {$executed_statements} statements: {$successful_statements} successful, {$failed_statements} failed";
+        
+        if ($overall_success) {
+            wp_send_json_success(array(
+                'message' => "✅ ALL STATEMENTS SUCCESSFUL - {$summary}",
+                'results' => $all_results,
+                'details' => $summary_messages
+            ));
+        } else {
+            // Send as success but with error message, so we can include results data
+            wp_send_json_success(array(
+                'message' => "❌ SOME STATEMENTS FAILED - {$summary}",
+                'results' => $all_results,
+                'details' => $summary_messages,
+                'has_errors' => true
+            ));
         }
     }
 }

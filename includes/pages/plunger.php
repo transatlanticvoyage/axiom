@@ -355,27 +355,35 @@ jQuery(document).ready(function($) {
                 
                 if (response.success) {
                     var message = typeof response.data === 'string' ? response.data : response.data.message;
-                    $('#sql-output').html('✅ SUCCESS: ' + message);
-                    $('#sql-results').css('border-color', '#28a745').show();
+                    var hasErrors = response.data.has_errors || false;
                     
-                    // If there are query results, populate crunchy_box
+                    $('#sql-output').html(message);
+                    
+                    // Set border color based on whether there were errors
+                    if (hasErrors) {
+                        $('#sql-results').css('border-color', '#ffc107').show(); // Warning yellow for mixed results
+                    } else {
+                        $('#sql-results').css('border-color', '#28a745').show(); // Success green
+                    }
+                    
+                    // Populate crunchy_box with detailed results
                     if (response.data.results) {
                         $('#crunchy-box').val(response.data.results);
                     } else {
-                        $('#crunchy-box').val('No query results (this was likely a modification command like ALTER, CREATE, etc.)');
+                        $('#crunchy-box').val('No detailed results available (this was likely a simple modification command).');
                     }
                 } else {
-                    $('#sql-output').html('❌ ERROR: ' + response.data);
+                    $('#sql-output').html('❌ ' + response.data);
                     $('#sql-results').css('border-color', '#dc3545').show();
-                    $('#crunchy-box').val('Error occurred - no results to display.');
+                    
+                    // Even on error, try to show any partial results that might be available
+                    $('#crunchy-box').val('Some statements failed. Check execution results above for details.');
                 }
                 
-                // Refresh the page after 5 seconds on success to update recent operations
-                if (response.success) {
-                    setTimeout(function() {
-                        location.reload();
-                    }, 5000);
-                }
+                // Refresh the page after 5 seconds to update recent operations
+                setTimeout(function() {
+                    location.reload();
+                }, 5000);
             },
             error: function() {
                 $('#sql-loading').hide();
