@@ -135,6 +135,21 @@ ALTER TABLE wp_zen_services ADD INDEX asn_service_page_id (asn_service_page_id);
         </div>
     </div>
 
+    <!-- Crunchy Box for Query Results -->
+    <div style="background: white; padding: 20px; border: 1px solid #ddd; border-radius: 5px; margin-top: 20px;">
+        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+            <h2 style="margin: 0; margin-right: 15px;"><strong>crunchy_box</strong></h2>
+            <button type="button" id="copy-crunchy-box" class="button button-secondary" style="padding: 4px 12px; font-size: 12px;">Copy</button>
+        </div>
+        <textarea 
+            id="crunchy-box" 
+            readonly 
+            rows="12" 
+            style="width: 100%; font-family: monospace; font-size: 13px; padding: 15px; border: 2px solid #28a745; border-radius: 5px; background: #f8fff9; color: #155724; resize: vertical;"
+            placeholder="Query results (like SHOW COLUMNS, DESCRIBE, etc.) will appear here..."
+        ></textarea>
+    </div>
+
     <!-- Recent Operations -->
     <div style="background: white; padding: 20px; border: 1px solid #ddd; border-radius: 5px; margin-top: 20px;">
         <h2>Recent SQL Operations</h2>
@@ -271,6 +286,30 @@ jQuery(document).ready(function($) {
         }, 2000);
     });
     
+    // Copy crunchy box button
+    $('#copy-crunchy-box').click(function() {
+        var crunchyContent = $('#crunchy-box').val();
+        
+        if (!crunchyContent.trim()) {
+            alert('Crunchy box is empty - nothing to copy!');
+            return;
+        }
+        
+        // Create temporary textarea to copy text
+        var tempTextarea = $('<textarea>');
+        $('body').append(tempTextarea);
+        tempTextarea.val(crunchyContent).select();
+        document.execCommand('copy');
+        tempTextarea.remove();
+        
+        // Visual feedback
+        var originalText = $(this).text();
+        $(this).text('✓ Copied!').css('background', '#28a745');
+        setTimeout(function() {
+            $('#copy-crunchy-box').text(originalText).css('background', '');
+        }, 2000);
+    });
+    
     // Clear button
     $('#clear-sql').click(function() {
         $('#sql-command-pasted').val('');
@@ -315,18 +354,27 @@ jQuery(document).ready(function($) {
                 $('#execute-sql').prop('disabled', false);
                 
                 if (response.success) {
-                    $('#sql-output').html('✅ SUCCESS: ' + response.data);
+                    var message = typeof response.data === 'string' ? response.data : response.data.message;
+                    $('#sql-output').html('✅ SUCCESS: ' + message);
                     $('#sql-results').css('border-color', '#28a745').show();
+                    
+                    // If there are query results, populate crunchy_box
+                    if (response.data.results) {
+                        $('#crunchy-box').val(response.data.results);
+                    } else {
+                        $('#crunchy-box').val('No query results (this was likely a modification command like ALTER, CREATE, etc.)');
+                    }
                 } else {
                     $('#sql-output').html('❌ ERROR: ' + response.data);
                     $('#sql-results').css('border-color', '#dc3545').show();
+                    $('#crunchy-box').val('Error occurred - no results to display.');
                 }
                 
-                // Refresh the page after 3 seconds on success to update recent operations
+                // Refresh the page after 5 seconds on success to update recent operations
                 if (response.success) {
                     setTimeout(function() {
                         location.reload();
-                    }, 3000);
+                    }, 5000);
                 }
             },
             error: function() {
@@ -334,6 +382,7 @@ jQuery(document).ready(function($) {
                 $('#execute-sql').prop('disabled', false);
                 $('#sql-output').html('❌ AJAX ERROR: Failed to communicate with server.');
                 $('#sql-results').css('border-color', '#dc3545').show();
+                $('#crunchy-box').val('AJAX communication error - no results available.');
             }
         });
     });

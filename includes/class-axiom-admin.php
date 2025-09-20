@@ -305,37 +305,97 @@ class Axiom_Admin {
         $operation_id = $wpdb->insert_id;
         
         // Execute the SQL
-        $result = $wpdb->query($sql);
+        $is_select_query = preg_match('/^(SHOW|DESCRIBE|DESC|SELECT)/i', trim($sql));
         
-        if ($result !== false) {
-            // Update operation status
-            $wpdb->update(
-                $wpdb->prefix . 'axiom_operations',
-                array(
-                    'status' => 'completed',
-                    'completed_at' => current_time('mysql')
-                ),
-                array('operation_id' => $operation_id)
-            );
+        if ($is_select_query) {
+            // For SELECT-type queries, get results
+            $results = $wpdb->get_results($sql, ARRAY_A);
             
-            if ($wpdb->last_error) {
-                wp_send_json_error('SQL executed but with warning: ' . $wpdb->last_error);
+            if ($results !== null) {
+                // Update operation status
+                $wpdb->update(
+                    $wpdb->prefix . 'axiom_operations',
+                    array(
+                        'status' => 'completed',
+                        'completed_at' => current_time('mysql')
+                    ),
+                    array('operation_id' => $operation_id)
+                );
+                
+                if ($wpdb->last_error) {
+                    wp_send_json_error('Query executed but with warning: ' . $wpdb->last_error);
+                } else {
+                    // Format results for display
+                    $formatted_results = '';
+                    if (!empty($results)) {
+                        // Create a simple table format
+                        $headers = array_keys($results[0]);
+                        $formatted_results .= implode("\t", $headers) . "\n";
+                        $formatted_results .= str_repeat("-", count($headers) * 15) . "\n";
+                        
+                        foreach ($results as $row) {
+                            $formatted_results .= implode("\t", array_values($row)) . "\n";
+                        }
+                    } else {
+                        $formatted_results = "No results returned.";
+                    }
+                    
+                    wp_send_json_success(array(
+                        'message' => 'Query executed successfully. ' . count($results) . ' rows returned.',
+                        'results' => $formatted_results
+                    ));
+                }
             } else {
-                wp_send_json_success('SQL executed successfully. Rows affected: ' . $result);
+                // Update operation status
+                $wpdb->update(
+                    $wpdb->prefix . 'axiom_operations',
+                    array(
+                        'status' => 'failed',
+                        'error_message' => $wpdb->last_error,
+                        'completed_at' => current_time('mysql')
+                    ),
+                    array('operation_id' => $operation_id)
+                );
+                
+                wp_send_json_error('Query execution failed: ' . $wpdb->last_error);
             }
         } else {
-            // Update operation status
-            $wpdb->update(
-                $wpdb->prefix . 'axiom_operations',
-                array(
-                    'status' => 'failed',
-                    'error_message' => $wpdb->last_error,
-                    'completed_at' => current_time('mysql')
-                ),
-                array('operation_id' => $operation_id)
-            );
+            // For non-SELECT queries (ALTER, CREATE, etc.)
+            $result = $wpdb->query($sql);
             
-            wp_send_json_error('SQL execution failed: ' . $wpdb->last_error);
+            if ($result !== false) {
+                // Update operation status
+                $wpdb->update(
+                    $wpdb->prefix . 'axiom_operations',
+                    array(
+                        'status' => 'completed',
+                        'completed_at' => current_time('mysql')
+                    ),
+                    array('operation_id' => $operation_id)
+                );
+                
+                if ($wpdb->last_error) {
+                    wp_send_json_error('SQL executed but with warning: ' . $wpdb->last_error);
+                } else {
+                    wp_send_json_success(array(
+                        'message' => 'SQL executed successfully. Rows affected: ' . $result,
+                        'results' => null
+                    ));
+                }
+            } else {
+                // Update operation status
+                $wpdb->update(
+                    $wpdb->prefix . 'axiom_operations',
+                    array(
+                        'status' => 'failed',
+                        'error_message' => $wpdb->last_error,
+                        'completed_at' => current_time('mysql')
+                    ),
+                    array('operation_id' => $operation_id)
+                );
+                
+                wp_send_json_error('SQL execution failed: ' . $wpdb->last_error);
+            }
         }
     }
 }
