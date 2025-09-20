@@ -13,7 +13,8 @@ class Axiom_Schema_Manager {
         'klyra' => 'klyra/klyra.php',
         'lumora' => 'lumora/lumora.php',
         'ruplin' => 'ruplin/ruplin.php',
-        'veyra' => 'veyra/veyra.php'
+        'veyra' => 'veyra/veyra.php',
+        'axiom' => 'axiom/axiom.php'
     );
     
     /**
@@ -247,6 +248,12 @@ class Axiom_Schema_Manager {
                 'plugin_slug' => 'veyra',
                 'plugin_path' => 'veyra/veyra.php',
                 'github_url' => 'https://github.com/transatlanticvoyage/veyra.git',
+                'branch_name' => 'main'
+            ),
+            array(
+                'plugin_slug' => 'axiom',
+                'plugin_path' => 'axiom/axiom.php',
+                'github_url' => 'https://github.com/transatlanticvoyage/axiom.git',
                 'branch_name' => 'main'
             ),
             array(
