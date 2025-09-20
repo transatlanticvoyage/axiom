@@ -14,6 +14,7 @@ class Axiom_Admin {
         add_action('wp_ajax_axiom_sync_plugin', array($this, 'ajax_sync_plugin'));
         add_action('wp_ajax_axiom_refresh_registry', array($this, 'ajax_refresh_registry'));
         add_action('wp_ajax_axiom_rebuild_table', array($this, 'ajax_rebuild_table'));
+        add_action('wp_ajax_axiom_execute_sql', array($this, 'ajax_execute_sql'));
     }
     
     /**
@@ -56,6 +57,15 @@ class Axiom_Admin {
             'manage_options',
             'axiom-operations',
             array($this, 'display_operations_page')
+        );
+        
+        add_submenu_page(
+            'axiom-dashboard',
+            'Axiom Plunger - Direct Schema Editor',
+            'Axiom Plunger',
+            'manage_options',
+            'axiomplunger',
+            array($this, 'display_plunger_page')
         );
     }
     
@@ -120,6 +130,13 @@ class Axiom_Admin {
         );
         
         include AXIOM_PLUGIN_PATH . 'includes/pages/operations.php';
+    }
+    
+    /**
+     * Display Axiom Plunger page
+     */
+    public function display_plunger_page() {
+        include AXIOM_PLUGIN_PATH . 'includes/pages/plunger.php';
     }
     
     /**
@@ -200,6 +217,100 @@ class Axiom_Admin {
             wp_send_json_success($result['message']);
         } else {
             wp_send_json_error($result['message']);
+        }
+    }
+    
+    /**
+     * AJAX: Execute SQL
+     */
+    public function ajax_execute_sql() {
+        check_ajax_referer('axiom_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $sql = stripslashes($_POST['sql']);
+        $sql = trim($sql);
+        
+        if (empty($sql)) {
+            wp_send_json_error('No SQL provided');
+        }
+        
+        // Security check - only allow certain operations
+        $allowed_patterns = array(
+            '/^ALTER\s+TABLE\s+\w+\s+ADD\s+COLUMN/i',
+            '/^ALTER\s+TABLE\s+\w+\s+ADD\s+INDEX/i', 
+            '/^ALTER\s+TABLE\s+\w+\s+ADD\s+KEY/i',
+            '/^CREATE\s+INDEX/i',
+            '/^SHOW\s+COLUMNS/i',
+            '/^SHOW\s+TABLES/i',
+            '/^DESCRIBE\s+\w+/i',
+            '/^DESC\s+\w+/i'
+        );
+        
+        $is_allowed = false;
+        foreach ($allowed_patterns as $pattern) {
+            if (preg_match($pattern, $sql)) {
+                $is_allowed = true;
+                break;
+            }
+        }
+        
+        if (!$is_allowed) {
+            wp_send_json_error('SQL operation not allowed. Only ALTER TABLE ADD COLUMN, ADD INDEX, CREATE INDEX, and SHOW/DESCRIBE commands are permitted.');
+        }
+        
+        global $wpdb;
+        
+        // Log the operation
+        $wpdb->insert(
+            $wpdb->prefix . 'axiom_operations',
+            array(
+                'operation_type' => 'direct_sql',
+                'target_plugin' => 'manual',
+                'target_table' => 'multiple',
+                'operation_data' => $sql,
+                'status' => 'running',
+                'user_id' => get_current_user_id(),
+                'created_at' => current_time('mysql')
+            )
+        );
+        
+        $operation_id = $wpdb->insert_id;
+        
+        // Execute the SQL
+        $result = $wpdb->query($sql);
+        
+        if ($result !== false) {
+            // Update operation status
+            $wpdb->update(
+                $wpdb->prefix . 'axiom_operations',
+                array(
+                    'status' => 'completed',
+                    'completed_at' => current_time('mysql')
+                ),
+                array('operation_id' => $operation_id)
+            );
+            
+            if ($wpdb->last_error) {
+                wp_send_json_error('SQL executed but with warning: ' . $wpdb->last_error);
+            } else {
+                wp_send_json_success('SQL executed successfully. Rows affected: ' . $result);
+            }
+        } else {
+            // Update operation status
+            $wpdb->update(
+                $wpdb->prefix . 'axiom_operations',
+                array(
+                    'status' => 'failed',
+                    'error_message' => $wpdb->last_error,
+                    'completed_at' => current_time('mysql')
+                ),
+                array('operation_id' => $operation_id)
+            );
+            
+            wp_send_json_error('SQL execution failed: ' . $wpdb->last_error);
         }
     }
 }
