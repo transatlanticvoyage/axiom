@@ -232,9 +232,34 @@ class Axiom_Admin {
         
         $sql = stripslashes($_POST['sql']);
         $sql = trim($sql);
+        $auto_convert = isset($_POST['auto_convert']) && $_POST['auto_convert'] === 'true';
         
         if (empty($sql)) {
             wp_send_json_error('No SQL provided');
+        }
+        
+        // Auto-convert wp_ prefix if requested
+        if ($auto_convert) {
+            global $wpdb;
+            $actual_prefix = $wpdb->prefix;
+            
+            // Pattern to match table names with wp_ prefix
+            // This covers: ALTER TABLE wp_table, FROM wp_table, JOIN wp_table, etc.
+            $patterns = array(
+                '/\b(ALTER\s+TABLE\s+)wp_(\w+)/i',
+                '/\b(FROM\s+)wp_(\w+)/i', 
+                '/\b(JOIN\s+)wp_(\w+)/i',
+                '/\b(INTO\s+)wp_(\w+)/i',
+                '/\b(UPDATE\s+)wp_(\w+)/i',
+                '/\b(INDEX\s+\w+\s+ON\s+)wp_(\w+)/i',
+                '/\b(SHOW\s+COLUMNS\s+FROM\s+)wp_(\w+)/i',
+                '/\b(DESCRIBE\s+)wp_(\w+)/i',
+                '/\b(DESC\s+)wp_(\w+)/i'
+            );
+            
+            foreach ($patterns as $pattern) {
+                $sql = preg_replace($pattern, '${1}' . $actual_prefix . '${2}', $sql);
+            }
         }
         
         // Security check - only allow certain operations

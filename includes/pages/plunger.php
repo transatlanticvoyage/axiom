@@ -56,6 +56,32 @@ if (!defined('ABSPATH')) {
         <h2>SQL Command Editor</h2>
         
         <form id="sql-executor-form">
+            <!-- Database Name Display -->
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Connected Database:</label>
+                <div style="display: flex; align-items: center;">
+                    <input 
+                        type="text" 
+                        id="database-name" 
+                        value="<?php echo esc_attr(DB_NAME); ?>" 
+                        readonly 
+                        style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 3px; background: #f8f9fa; font-family: monospace; font-size: 14px;"
+                    >
+                    <button type="button" id="copy-db-name" class="button button-secondary" style="margin-left: 8px;">Copy</button>
+                </div>
+            </div>
+            
+            <!-- Auto-prefix conversion option -->
+            <div style="margin-bottom: 15px;">
+                <label style="display: flex; align-items: center; font-weight: bold;">
+                    <input type="checkbox" id="auto-convert-prefix" checked style="margin-right: 8px;">
+                    Convert wp_ prefixes in tables in the SQL automatically
+                </label>
+                <p style="margin: 5px 0 0 24px; font-size: 13px; color: #666;">
+                    Your site prefix: <code><?php global $wpdb; echo $wpdb->prefix; ?></code>
+                </p>
+            </div>
+            
             <div style="margin-bottom: 15px;">
                 <label for="sql-command" style="display: block; font-weight: bold; margin-bottom: 5px;">SQL Command:</label>
                 <textarea 
@@ -169,6 +195,25 @@ jQuery(document).ready(function($) {
         $('#sql-command').val(sql);
     });
     
+    // Copy database name button
+    $('#copy-db-name').click(function() {
+        var dbName = $('#database-name').val();
+        
+        // Create temporary input to copy text
+        var tempInput = $('<input>');
+        $('body').append(tempInput);
+        tempInput.val(dbName).select();
+        document.execCommand('copy');
+        tempInput.remove();
+        
+        // Visual feedback
+        var originalText = $(this).text();
+        $(this).text('✓ Copied!').css('background', '#28a745');
+        setTimeout(function() {
+            $('#copy-db-name').text(originalText).css('background', '');
+        }, 2000);
+    });
+    
     // Clear button
     $('#clear-sql').click(function() {
         $('#sql-command').val('');
@@ -191,6 +236,8 @@ jQuery(document).ready(function($) {
             return;
         }
         
+        var autoConvert = $('#auto-convert-prefix').is(':checked');
+        
         // Show loading
         $('#sql-loading').show();
         $('#sql-results').hide();
@@ -202,7 +249,8 @@ jQuery(document).ready(function($) {
             data: {
                 action: 'axiom_execute_sql',
                 nonce: '<?php echo wp_create_nonce('axiom_nonce'); ?>',
-                sql: sql
+                sql: sql,
+                auto_convert: autoConvert
             },
             success: function(response) {
                 $('#sql-loading').hide();
