@@ -8,6 +8,8 @@
  * License: GPL v2 or later
  */
 
+// Test comment to verify VSCode source control detection for axiom plugin
+
 // Prevent direct access
 if (!defined('ABSPATH')) {
     exit;
