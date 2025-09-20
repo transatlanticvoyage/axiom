@@ -83,17 +83,28 @@ if (!defined('ABSPATH')) {
             </div>
             
             <div style="margin-bottom: 15px;">
-                <label for="sql-command" style="display: block; font-weight: bold; margin-bottom: 5px;">SQL Command:</label>
+                <label for="sql-command-pasted" style="display: block; font-weight: bold; margin-bottom: 5px;">SQL Command (pasted):</label>
                 <textarea 
-                    id="sql-command" 
+                    id="sql-command-pasted" 
                     name="sql" 
                     rows="8" 
                     style="width: 100%; font-family: monospace; font-size: 14px; padding: 10px; border: 1px solid #ddd; border-radius: 3px;"
                     placeholder="Enter your SQL command here...
 
 Example for your current issue:
-ALTER TABLE <?php echo $wpdb->prefix; ?>zen_services ADD COLUMN asn_service_page_id BIGINT(20) UNSIGNED DEFAULT NULL;
-ALTER TABLE <?php echo $wpdb->prefix; ?>zen_services ADD INDEX asn_service_page_id (asn_service_page_id);"
+ALTER TABLE wp_zen_services ADD COLUMN asn_service_page_id BIGINT(20) UNSIGNED DEFAULT NULL;
+ALTER TABLE wp_zen_services ADD INDEX asn_service_page_id (asn_service_page_id);"
+                ></textarea>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label for="sql-command-final" style="display: block; font-weight: bold; margin-bottom: 5px;">SQL Command (final):</label>
+                <textarea 
+                    id="sql-command-final" 
+                    rows="8" 
+                    style="width: 100%; font-family: monospace; font-size: 14px; padding: 10px; border: 1px solid #e6f3ff; border-radius: 3px; background: #f8f9fa; color: #495057;"
+                    readonly
+                    placeholder="The final SQL that will be executed will appear here..."
                 ></textarea>
             </div>
             
@@ -189,10 +200,56 @@ jQuery(document).ready(function($) {
         }
     });
     
+    // Function to convert SQL prefixes
+    function convertSqlPrefixes(sql) {
+        if (!$('#auto-convert-prefix').is(':checked')) {
+            return sql;
+        }
+        
+        var actualPrefix = '<?php global $wpdb; echo $wpdb->prefix; ?>';
+        
+        // Pattern to match table names with wp_ prefix
+        var patterns = [
+            /\b(ALTER\s+TABLE\s+)wp_(\w+)/gi,
+            /\b(FROM\s+)wp_(\w+)/gi, 
+            /\b(JOIN\s+)wp_(\w+)/gi,
+            /\b(INTO\s+)wp_(\w+)/gi,
+            /\b(UPDATE\s+)wp_(\w+)/gi,
+            /\b(INDEX\s+\w+\s+ON\s+)wp_(\w+)/gi,
+            /\b(SHOW\s+COLUMNS\s+FROM\s+)wp_(\w+)/gi,
+            /\b(DESCRIBE\s+)wp_(\w+)/gi,
+            /\b(DESC\s+)wp_(\w+)/gi
+        ];
+        
+        patterns.forEach(function(pattern) {
+            sql = sql.replace(pattern, '$1' + actualPrefix + '$2');
+        });
+        
+        return sql;
+    }
+    
+    // Function to update final SQL
+    function updateFinalSql() {
+        var pastedSql = $('#sql-command-pasted').val();
+        var finalSql = convertSqlPrefixes(pastedSql);
+        $('#sql-command-final').val(finalSql);
+    }
+    
+    // Update final SQL when pasted SQL changes
+    $('#sql-command-pasted').on('input keyup paste', function() {
+        setTimeout(updateFinalSql, 10); // Small delay to ensure paste content is processed
+    });
+    
+    // Update final SQL when prefix conversion checkbox changes
+    $('#auto-convert-prefix').change(function() {
+        updateFinalSql();
+    });
+    
     // Quick SQL buttons
     $('.quick-sql').click(function() {
         var sql = $(this).data('sql');
-        $('#sql-command').val(sql);
+        $('#sql-command-pasted').val(sql);
+        updateFinalSql();
     });
     
     // Copy database name button
@@ -216,7 +273,8 @@ jQuery(document).ready(function($) {
     
     // Clear button
     $('#clear-sql').click(function() {
-        $('#sql-command').val('');
+        $('#sql-command-pasted').val('');
+        $('#sql-command-final').val('');
         $('#sql-results').hide();
         $('#confirm-execution').prop('checked', false).trigger('change');
     });
@@ -230,7 +288,7 @@ jQuery(document).ready(function($) {
             return;
         }
         
-        var sql = $('#sql-command').val().trim();
+        var sql = $('#sql-command-final').val().trim();
         if (!sql) {
             alert('Please enter a SQL command.');
             return;
@@ -290,14 +348,25 @@ jQuery(document).ready(function($) {
     text-align: left;
 }
 
-#sql-command {
+#sql-command-pasted {
     border: 2px solid #ddd !important;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-#sql-command:focus {
+#sql-command-pasted:focus {
     border-color: #0073aa !important;
     box-shadow: 0 0 0 1px #0073aa;
+}
+
+#sql-command-final {
+    border: 2px solid #e6f3ff !important;
+    background: #f8f9fa !important;
+    box-shadow: 0 2px 4px rgba(0,123,255,0.1);
+}
+
+#sql-command-final:focus {
+    border-color: #007cba !important;
+    box-shadow: 0 0 0 1px #007cba;
 }
 
 #execute-sql {
