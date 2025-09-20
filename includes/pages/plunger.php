@@ -19,11 +19,15 @@ if (!defined('ABSPATH')) {
             Only the following operations are allowed for safety:
         </p>
         <ul style="color: #856404;">
-            <li><code>ALTER TABLE [table] ADD COLUMN [column] [type]</code> - Add new columns</li>
+            <li><code>ALTER TABLE [table] ADD/DROP COLUMN [column] [type]</code> - Modify table structure</li>
             <li><code>ALTER TABLE [table] ADD INDEX/KEY [name] ([column])</code> - Add indexes</li>
             <li><code>CREATE INDEX [name] ON [table] ([column])</code> - Create indexes</li>
-            <li><code>SHOW COLUMNS FROM [table]</code> - View table structure</li>
-            <li><code>DESCRIBE [table]</code> - View table structure</li>
+            <li><code>INSERT INTO [table] ([columns]) VALUES ([values])</code> - Insert data</li>
+            <li><code>REPLACE INTO [table] ([columns]) VALUES ([values])</code> - Replace data</li>
+            <li><code>UPDATE [table] SET [column=value] WHERE [condition]</code> - Update data</li>
+            <li><code>DELETE FROM [table] WHERE [condition]</code> - Delete data</li>
+            <li><code>SELECT [columns] FROM [table] WHERE [condition]</code> - Query data</li>
+            <li><code>SHOW COLUMNS/TABLES, DESCRIBE [table]</code> - View structure</li>
         </ul>
     </div>
 

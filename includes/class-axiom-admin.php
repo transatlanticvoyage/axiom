@@ -267,11 +267,17 @@ class Axiom_Admin {
             '/^ALTER\s+TABLE\s+\w+\s+ADD\s+COLUMN/i',
             '/^ALTER\s+TABLE\s+\w+\s+ADD\s+INDEX/i', 
             '/^ALTER\s+TABLE\s+\w+\s+ADD\s+KEY/i',
+            '/^ALTER\s+TABLE\s+\w+\s+DROP\s+COLUMN/i',
             '/^CREATE\s+INDEX/i',
+            '/^INSERT\s+INTO\s+\w+/i',
+            '/^REPLACE\s+INTO\s+\w+/i',
+            '/^UPDATE\s+\w+\s+SET/i',
+            '/^DELETE\s+FROM\s+\w+/i',
             '/^SHOW\s+COLUMNS/i',
             '/^SHOW\s+TABLES/i',
             '/^DESCRIBE\s+\w+/i',
-            '/^DESC\s+\w+/i'
+            '/^DESC\s+\w+/i',
+            '/^SELECT\s+/i'
         );
         
         $is_allowed = false;
