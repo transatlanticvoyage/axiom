@@ -15,7 +15,7 @@ class Axiom_Schema_Manager {
         'harbor' => 'harbor/harbor.php',
         'klyra' => 'klyra/klyra.php',
         'lumora' => 'lumora/lumora.php',
-        'nivaro' => 'nivaro/nivaro-simple.php',
+        'nivaro' => 'nivaro/nivaro.php',
         'ruplin' => 'ruplin/ruplin.php',
         'trillan' => 'trillan/trillan.php',
         'veyra' => 'veyra/veyra.php'
@@ -274,7 +274,7 @@ class Axiom_Schema_Manager {
             ),
             array(
                 'plugin_slug' => 'nivaro',
-                'plugin_path' => 'nivaro/nivaro-simple.php',
+                'plugin_path' => 'nivaro/nivaro.php',
                 'github_url' => 'https://github.com/transatlanticvoyage/nivaro.git',
                 'branch_name' => 'main'
             ),
