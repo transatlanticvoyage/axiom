@@ -23,6 +23,7 @@ define('AXIOM_PLUGIN_URL', plugin_dir_url(__FILE__));
 // Include required files
 require_once AXIOM_PLUGIN_PATH . 'includes/class-axiom-admin.php';
 require_once AXIOM_PLUGIN_PATH . 'includes/class-axiom-schema-manager.php';
+require_once AXIOM_PLUGIN_PATH . 'includes/class-axiom-shovel-db.php';
 
 /**
  * Main Axiom Plugin Class
@@ -31,6 +32,7 @@ class Axiom {
     
     private $admin;
     private $schema_manager;
+    private $shovel_db;
     
     public function __construct() {
         // Initialize on plugins loaded to ensure all plugins are available
@@ -47,6 +49,10 @@ class Axiom {
         // Initialize admin interface
         if (is_admin()) {
             $this->admin = new Axiom_Admin();
+            $this->shovel_db = new Axiom_Shovel_DB();
+            
+            global $axiom_shovel_db;
+            $axiom_shovel_db = $this->shovel_db;
         }
         
         // Initialize schema manager

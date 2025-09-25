@@ -67,6 +67,15 @@ class Axiom_Admin {
             'axiomplunger',
             array($this, 'display_plunger_page')
         );
+        
+        add_submenu_page(
+            'axiom-dashboard',
+            'Axiom Shovel - Database Browser',
+            'Axiom Shovel',
+            'manage_options',
+            'axiom_shovel',
+            array($this, 'display_shovel_page')
+        );
     }
     
     /**
@@ -79,6 +88,11 @@ class Axiom_Admin {
         
         wp_enqueue_script('axiom-admin', AXIOM_PLUGIN_URL . 'assets/js/axiom-admin.js', array('jquery'), AXIOM_PLUGIN_VERSION, true);
         wp_enqueue_style('axiom-admin', AXIOM_PLUGIN_URL . 'assets/css/axiom-admin.css', array(), AXIOM_PLUGIN_VERSION);
+        
+        if ($hook === 'axiom_page_axiom_shovel') {
+            wp_enqueue_script('axiom-shovel', AXIOM_PLUGIN_URL . 'assets/js/axiom-shovel.js', array('jquery'), AXIOM_PLUGIN_VERSION, true);
+            wp_enqueue_style('axiom-shovel', AXIOM_PLUGIN_URL . 'assets/css/axiom-shovel.css', array(), AXIOM_PLUGIN_VERSION);
+        }
         
         wp_localize_script('axiom-admin', 'axiom_ajax', array(
             'ajax_url' => admin_url('admin-ajax.php'),
@@ -137,6 +151,16 @@ class Axiom_Admin {
      */
     public function display_plunger_page() {
         include AXIOM_PLUGIN_PATH . 'includes/pages/plunger.php';
+    }
+    
+    /**
+     * Display Axiom Shovel page
+     */
+    public function display_shovel_page() {
+        global $axiom_shovel_db;
+        if ($axiom_shovel_db) {
+            $axiom_shovel_db->display_shovel_page();
+        }
     }
     
     /**
