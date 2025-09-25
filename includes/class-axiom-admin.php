@@ -271,7 +271,7 @@ class Axiom_Admin {
             '/^CREATE\s+INDEX/i',
             '/^INSERT\s+INTO\s+\w+/i',
             '/^REPLACE\s+INTO\s+\w+/i',
-            '/^UPDATE\s+\w+\s+SET/i',
+            '/^UPDATE\s+[\w_]+\s+SET/i',
             '/^DELETE\s+FROM\s+\w+/i',
             '/^SHOW\s+COLUMNS/i',
             '/^SHOW\s+TABLES/i',
@@ -289,7 +289,7 @@ class Axiom_Admin {
         }
         
         if (!$is_allowed) {
-            wp_send_json_error('SQL operation not allowed. Only ALTER TABLE ADD COLUMN, ADD INDEX, CREATE INDEX, and SHOW/DESCRIBE commands are permitted.');
+            wp_send_json_error('SQL operation not allowed. Permitted commands: ALTER TABLE, CREATE INDEX, INSERT, REPLACE, UPDATE, DELETE, SELECT, SHOW, DESCRIBE.');
         }
         
         global $wpdb;
