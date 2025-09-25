@@ -11,7 +11,7 @@ class Axiom_Schema_Manager {
         'beacon' => 'beacon/beacon.php',
         'brimora' => 'brimora/brimora.php',
         'fathom' => 'fathom/fathom.php',
-        'grove' => 'grove-wp-plugin/grove.php',
+        'grove' => 'grove/grove.php',
         'harbor' => 'harbor/harbor.php',
         'klyra' => 'klyra/klyra.php',
         'lumora' => 'lumora/lumora.php',
@@ -250,8 +250,8 @@ class Axiom_Schema_Manager {
             ),
             array(
                 'plugin_slug' => 'grove',
-                'plugin_path' => 'grove-wp-plugin/grove.php',
-                'github_url' => 'https://github.com/transatlanticvoyage/grove-wp-plugin.git',
+                'plugin_path' => 'grove/grove.php',
+                'github_url' => 'https://github.com/transatlanticvoyage/grove.git',
                 'branch_name' => 'main'
             ),
             array(
