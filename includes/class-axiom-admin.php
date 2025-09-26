@@ -28,7 +28,7 @@ class Axiom_Admin {
             'axiom-dashboard',
             array($this, 'display_dashboard'),
             'dashicons-database-view',
-            3
+            3.05
         );
         
         // Add submenu pages
