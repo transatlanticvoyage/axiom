@@ -76,6 +76,15 @@ class Axiom_Admin {
             'axiom_shovel',
             array($this, 'display_shovel_page')
         );
+        
+        add_submenu_page(
+            'axiom-dashboard',
+            'Venlazar',
+            'Venlazar',
+            'manage_options',
+            'axiomvenlazar',
+            array($this, 'display_venlazar_page')
+        );
     }
     
     /**
@@ -161,6 +170,13 @@ class Axiom_Admin {
         if ($axiom_shovel_db) {
             $axiom_shovel_db->display_shovel_page();
         }
+    }
+    
+    /**
+     * Display Venlazar page
+     */
+    public function display_venlazar_page() {
+        include AXIOM_PLUGIN_PATH . 'includes/pages/venlazar.php';
     }
     
     /**
