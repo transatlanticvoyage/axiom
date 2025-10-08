@@ -1,0 +1,205 @@
+/**
+ * Axiom Admin Styles
+ */
+
+/* Dashboard Cards */
+.axiom-card {
+    background: white;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.axiom-card h3 {
+    margin: 0 0 10px 0;
+    color: #23282d;
+    font-size: 16px;
+}
+
+/* Status Indicators */
+.axiom-status-good {
+    color: #00a32a;
+}
+
+.axiom-status-warning {
+    color: #dba617;
+}
+
+.axiom-status-error {
+    color: #d63638;
+}
+
+/* Health Check Results */
+.axiom-health-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.axiom-health-item:last-child {
+    border-bottom: none;
+}
+
+.axiom-health-status {
+    font-weight: bold;
+    min-width: 60px;
+}
+
+/* Action Buttons */
+.axiom-btn-primary {
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+}
+
+.axiom-btn-danger {
+    background: #d63638;
+    border-color: #d63638;
+    color: #fff;
+}
+
+.axiom-btn-warning {
+    background: #dba617;
+    border-color: #dba617;
+    color: #fff;
+}
+
+/* Messages */
+#axiom-messages {
+    margin: 20px 0;
+}
+
+#axiom-messages .notice {
+    margin: 5px 0;
+}
+
+/* Tables */
+.axiom-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+}
+
+.axiom-table th,
+.axiom-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.axiom-table th {
+    background-color: #f9f9f9;
+    font-weight: bold;
+}
+
+.axiom-table tr:hover {
+    background-color: #f5f5f5;
+}
+
+/* Code blocks */
+.axiom-code {
+    background: #f0f0f1;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 13px;
+}
+
+/* Plugin status badges */
+.axiom-plugin-status {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.axiom-plugin-status.active {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.axiom-plugin-status.installed {
+    background: #fff3cd;
+    color: #664d03;
+}
+
+.axiom-plugin-status.missing {
+    background: #f8d7da;
+    color: #842029;
+}
+
+/* Loading states */
+.axiom-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.axiom-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #2271b1;
+    border-radius: 50%;
+    animation: axiom-spin 1s linear infinite;
+    margin-left: 8px;
+}
+
+@keyframes axiom-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .axiom-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .axiom-table {
+        font-size: 14px;
+    }
+    
+    .axiom-table th,
+    .axiom-table td {
+        padding: 8px;
+    }
+}
+
+/* Alert boxes */
+.axiom-alert {
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 4px;
+    border: 1px solid;
+}
+
+.axiom-alert.success {
+    background: #e7f7d3;
+    border-color: #68de7c;
+    color: #155724;
+}
+
+.axiom-alert.warning {
+    background: #fff2cd;
+    border-color: #dba617;
+    color: #8a6914;
+}
+
+.axiom-alert.error {
+    background: #fbeaea;
+    border-color: #d63638;
+    color: #721c24;
+}
+
+.axiom-alert h4 {
+    margin: 0 0 10px 0;
+}
+
+.axiom-alert p:last-child {
+    margin-bottom: 0;
+}
