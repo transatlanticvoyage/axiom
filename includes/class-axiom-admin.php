@@ -272,6 +272,15 @@ class Axiom_Admin {
         
         $sql = stripslashes($_POST['sql']);
         $sql = trim($sql);
+        
+        // Remove SQL comments
+        // Remove -- style comments
+        $sql = preg_replace('/--.*$/m', '', $sql);
+        // Remove /* */ style comments
+        $sql = preg_replace('/\/\*.*?\*\//s', '', $sql);
+        // Trim again after removing comments
+        $sql = trim($sql);
+        
         $auto_convert = isset($_POST['auto_convert']) && $_POST['auto_convert'] === 'true';
         
         if (empty($sql)) {
@@ -308,16 +317,24 @@ class Axiom_Admin {
             '/^ALTER\s+TABLE\s+[\w`]+\s+ADD\s+INDEX/i', 
             '/^ALTER\s+TABLE\s+[\w`]+\s+ADD\s+KEY/i',
             '/^ALTER\s+TABLE\s+[\w`]+\s+DROP\s+COLUMN/i',
+            '/^ALTER\s+TABLE\s+[\w`]+\s+DROP\s+INDEX/i',
+            '/^ALTER\s+TABLE\s+[\w`]+\s+DROP\s+KEY/i',
+            '/^ALTER\s+TABLE\s+[\w`]+\s+DROP\s+PRIMARY/i',
+            '/^ALTER\s+TABLE\s+[\w`]+\s+DROP\s+FOREIGN/i',
             '/^ALTER\s+TABLE\s+[\w`]+\s+MODIFY\s+COLUMN/i',
             '/^ALTER\s+TABLE\s+[\w`]+\s+CHANGE\s+COLUMN/i',
+            '/^ALTER\s+TABLE\s+[\w`]+/i',
             '/^CREATE\s+TABLE\s+[\w`]+/i',
             '/^CREATE\s+INDEX/i',
+            '/^DROP\s+INDEX/i',
             '/^INSERT\s+INTO\s+[\w`]+/i',
             '/^REPLACE\s+INTO\s+[\w`]+/i',
             '/^UPDATE\s+[\w_`]+\s+SET/i',
             '/^DELETE\s+FROM\s+[\w`]+/i',
             '/^SHOW\s+COLUMNS/i',
             '/^SHOW\s+TABLES/i',
+            '/^SHOW\s+INDEXES/i',
+            '/^SHOW\s+INDEX/i',
             '/^DESCRIBE\s+[\w`]+/i',
             '/^DESC\s+[\w`]+/i',
             '/^SELECT\s+/i'
