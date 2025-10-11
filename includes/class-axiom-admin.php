@@ -304,20 +304,22 @@ class Axiom_Admin {
         
         // Security check - only allow certain operations
         $allowed_patterns = array(
-            '/^ALTER\s+TABLE\s+\w+\s+ADD\s+COLUMN/i',
-            '/^ALTER\s+TABLE\s+\w+\s+ADD\s+INDEX/i', 
-            '/^ALTER\s+TABLE\s+\w+\s+ADD\s+KEY/i',
-            '/^ALTER\s+TABLE\s+\w+\s+DROP\s+COLUMN/i',
-            '/^CREATE\s+TABLE\s+\w+/i',
+            '/^ALTER\s+TABLE\s+[\w`]+\s+ADD\s+COLUMN\s+/i',
+            '/^ALTER\s+TABLE\s+[\w`]+\s+ADD\s+INDEX/i', 
+            '/^ALTER\s+TABLE\s+[\w`]+\s+ADD\s+KEY/i',
+            '/^ALTER\s+TABLE\s+[\w`]+\s+DROP\s+COLUMN/i',
+            '/^ALTER\s+TABLE\s+[\w`]+\s+MODIFY\s+COLUMN/i',
+            '/^ALTER\s+TABLE\s+[\w`]+\s+CHANGE\s+COLUMN/i',
+            '/^CREATE\s+TABLE\s+[\w`]+/i',
             '/^CREATE\s+INDEX/i',
-            '/^INSERT\s+INTO\s+\w+/i',
-            '/^REPLACE\s+INTO\s+\w+/i',
-            '/^UPDATE\s+[\w_]+\s+SET/i',
-            '/^DELETE\s+FROM\s+\w+/i',
+            '/^INSERT\s+INTO\s+[\w`]+/i',
+            '/^REPLACE\s+INTO\s+[\w`]+/i',
+            '/^UPDATE\s+[\w_`]+\s+SET/i',
+            '/^DELETE\s+FROM\s+[\w`]+/i',
             '/^SHOW\s+COLUMNS/i',
             '/^SHOW\s+TABLES/i',
-            '/^DESCRIBE\s+\w+/i',
-            '/^DESC\s+\w+/i',
+            '/^DESCRIBE\s+[\w`]+/i',
+            '/^DESC\s+[\w`]+/i',
             '/^SELECT\s+/i'
         );
         
