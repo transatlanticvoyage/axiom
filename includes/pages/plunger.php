@@ -21,6 +21,8 @@ if (!defined('ABSPATH')) {
         <ul style="color: #856404;">
             <li><code>ALTER TABLE [table] ADD/DROP COLUMN [column] [type]</code> - Modify table structure</li>
             <li><code>ALTER TABLE [table] ADD INDEX/KEY [name] ([column])</code> - Add indexes</li>
+            <li><code>CREATE TABLE [table] (...)</code> - Create new tables</li>
+            <li><code>DROP TABLE [table]</code> - Drop tables (DANGER!)</li>
             <li><code>CREATE INDEX [name] ON [table] ([column])</code> - Create indexes</li>
             <li><code>INSERT INTO [table] ([columns]) VALUES ([values])</code> - Insert data</li>
             <li><code>REPLACE INTO [table] ([columns]) VALUES ([values])</code> - Replace data</li>
