@@ -108,9 +108,8 @@ ALTER TABLE wp_zen_services ADD INDEX asn_service_page_id (asn_service_page_id);
                 <textarea 
                     id="sql-command-final" 
                     rows="8" 
-                    style="width: 100%; font-family: monospace; font-size: 14px; padding: 10px; border: 1px solid #e6f3ff; border-radius: 3px; background: #f8f9fa; color: #495057;"
-                    readonly
-                    placeholder="The final SQL that will be executed will appear here..."
+                    style="width: 100%; font-family: monospace; font-size: 14px; padding: 10px; border: 1px solid #e6f3ff; border-radius: 3px; background: #fff; color: #495057;"
+                    placeholder="The final SQL that will be executed will appear here. You can edit it before executing."
                 ></textarea>
             </div>
             

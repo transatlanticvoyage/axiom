@@ -326,7 +326,7 @@ class Axiom_Admin {
             '/^ALTER\s+TABLE\s+[\w`]+/i',
             '/^CREATE\s+TABLE\s+[\w`]+/i',
             '/^CREATE\s+INDEX/i',
-            '/^DROP\s+TABLE/i',
+            '/^DROP\s+TABLE(\s+IF\s+EXISTS)?\s+/i',
             '/^DROP\s+INDEX/i',
             '/^INSERT\s+INTO\s+[\w`]+/i',
             '/^REPLACE\s+INTO\s+[\w`]+/i',
