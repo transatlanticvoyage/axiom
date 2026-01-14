@@ -12,6 +12,7 @@ class Axiom_Shovel_DB {
         add_action('wp_ajax_axiom_get_table_data', array($this, 'ajax_get_table_data'));
         add_action('wp_ajax_axiom_get_table_structure', array($this, 'ajax_get_table_structure'));
         add_action('wp_ajax_axiom_search_table', array($this, 'ajax_search_table'));
+        add_action('wp_ajax_axiom_update_row', array($this, 'ajax_update_row'));
     }
     
     public function get_all_tables() {
@@ -237,6 +238,90 @@ class Axiom_Shovel_DB {
             'page' => $page,
             'limit' => $limit,
             'total_pages' => ceil($results['total'] / $limit)
+        ));
+    }
+    
+    public function ajax_update_row() {
+        check_ajax_referer('axiom_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $table = sanitize_text_field($_POST['table']);
+        $original_data = json_decode(stripslashes($_POST['original_data']), true);
+        $updated_data = json_decode(stripslashes($_POST['updated_data']), true);
+        
+        // Validate table name
+        $table = $this->sanitize_table_name($table);
+        if (!$table) {
+            wp_send_json_error('Invalid table name');
+        }
+        
+        // Build UPDATE query
+        $set_parts = array();
+        $set_values = array();
+        
+        foreach ($updated_data as $column => $value) {
+            $column = $this->sanitize_column_name($column);
+            if (!$column) {
+                continue;
+            }
+            
+            if ($value === null) {
+                $set_parts[] = "`{$column}` = NULL";
+            } else {
+                $set_parts[] = "`{$column}` = %s";
+                $set_values[] = $value;
+            }
+        }
+        
+        if (empty($set_parts)) {
+            wp_send_json_error('No valid columns to update');
+        }
+        
+        // Build WHERE clause using original data
+        $where_parts = array();
+        $where_values = array();
+        
+        foreach ($original_data as $column => $value) {
+            $column = $this->sanitize_column_name($column);
+            if (!$column) {
+                continue;
+            }
+            
+            if ($value === null) {
+                $where_parts[] = "`{$column}` IS NULL";
+            } else {
+                $where_parts[] = "`{$column}` = %s";
+                $where_values[] = $value;
+            }
+        }
+        
+        if (empty($where_parts)) {
+            wp_send_json_error('Cannot identify row to update');
+        }
+        
+        // Combine the query
+        $sql = "UPDATE `{$table}` SET " . implode(', ', $set_parts) . " WHERE " . implode(' AND ', $where_parts);
+        
+        // Prepare the query with all values
+        $all_values = array_merge($set_values, $where_values);
+        
+        if (!empty($all_values)) {
+            $sql = $this->wpdb->prepare($sql, $all_values);
+        }
+        
+        // Execute the update
+        $result = $this->wpdb->query($sql);
+        
+        if ($result === false) {
+            wp_send_json_error('Database update failed: ' . $this->wpdb->last_error);
+        }
+        
+        wp_send_json_success(array(
+            'rows_affected' => $result,
+            'message' => 'Row updated successfully'
         ));
     }
     

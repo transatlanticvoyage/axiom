@@ -153,6 +153,36 @@ if (!defined('ABSPATH')) {
     </div>
 </div>
 
+<div id="edit-row-modal" class="shovel-modal shovel-modal-fullscreen" style="display: none;">
+    <div class="shovel-modal-content shovel-modal-fullscreen-content">
+        <div class="shovel-modal-header">
+            <h2>Edit Row</h2>
+            <button type="button" class="shovel-modal-close" id="close-edit-modal">&times;</button>
+        </div>
+        <div class="shovel-modal-body">
+            <div class="shovel-edit-info">
+                <p><strong>Table:</strong> <span id="edit-modal-table"></span></p>
+            </div>
+            <div class="shovel-edit-grid">
+                <table class="shovel-edit-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 200px;">Column</th>
+                            <th style="width: 150px;">Type</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody id="edit-fields-container"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="shovel-modal-footer">
+            <button type="button" class="button button-primary" id="save-row-btn">Save Changes</button>
+            <button type="button" class="button button-secondary" id="cancel-edit-btn">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <script type="text/javascript">
 var axiomShovel = {
     currentTable: null,
@@ -163,6 +193,8 @@ var axiomShovel = {
     allTables: [],
     sortColumn: null,
     sortOrder: 'ASC',
-    searchQuery: null
+    searchQuery: null,
+    editingRow: null,
+    editingColumns: null
 };
 </script>

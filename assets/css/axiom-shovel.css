@@ -419,6 +419,104 @@
     font-weight: bold;
 }
 
+.shovel-modal-fullscreen .shovel-modal-fullscreen-content {
+    max-width: 100%;
+    width: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    margin: 0;
+}
+
+.shovel-edit-info {
+    background: #f0f8ff;
+    border: 1px solid #bee5eb;
+    padding: 12px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
+
+.shovel-edit-info p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.shovel-edit-grid {
+    overflow: auto;
+    max-height: calc(100vh - 250px);
+}
+
+.shovel-edit-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.shovel-edit-table th {
+    background: #f9f9f9;
+    padding: 12px;
+    text-align: left;
+    border-bottom: 2px solid #ddd;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.shovel-edit-table td {
+    padding: 12px;
+    border-bottom: 1px solid #e0e0e0;
+    vertical-align: middle;
+}
+
+.shovel-edit-table .column-name {
+    font-family: monospace;
+    font-weight: bold;
+    color: #23282d;
+}
+
+.shovel-edit-table .column-type {
+    font-family: monospace;
+    color: #666;
+    font-size: 12px;
+}
+
+.shovel-edit-table input[type="text"],
+.shovel-edit-table textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 14px;
+    font-family: monospace;
+}
+
+.shovel-edit-table textarea {
+    min-height: 60px;
+    resize: vertical;
+}
+
+.shovel-edit-table input[type="text"]:focus,
+.shovel-edit-table textarea:focus {
+    border-color: #2271b1;
+    outline: none;
+    box-shadow: 0 0 0 1px #2271b1;
+}
+
+.shovel-edit-table .null-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.shovel-edit-table .primary-key-indicator {
+    background: #fff3cd;
+    color: #856404;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    margin-left: 8px;
+}
+
 @media (max-width: 1200px) {
     .axiom-shovel-container {
         flex-direction: column;

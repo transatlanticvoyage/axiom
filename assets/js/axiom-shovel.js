@@ -159,6 +159,10 @@ jQuery(document).ready(function($) {
         const columns = Object.keys(data[0]);
         const $headerRow = $('<tr></tr>');
         
+        // Add Edit column header first
+        const $editHeader = $('<th style="width: 60px; text-align: center;">Actions</th>');
+        $headerRow.append($editHeader);
+        
         columns.forEach(function(column) {
             const $th = $('<th class="sortable"></th>').text(column);
             $th.attr('data-column', column);
@@ -190,8 +194,17 @@ jQuery(document).ready(function($) {
         
         $head.append($headerRow);
         
-        data.forEach(function(row) {
+        data.forEach(function(row, index) {
             const $tr = $('<tr></tr>');
+            
+            // Add Edit button cell first
+            const $editCell = $('<td style="text-align: center;"></td>');
+            const $editBtn = $('<button type="button" class="button button-small">Edit</button>');
+            $editBtn.on('click', function() {
+                openEditModal(row, columns);
+            });
+            $editCell.append($editBtn);
+            $tr.append($editCell);
             
             columns.forEach(function(column) {
                 const value = row[column];
@@ -490,4 +503,233 @@ jQuery(document).ready(function($) {
         };
         return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
     }
+    
+    function openEditModal(rowData, columns) {
+        axiomShovel.editingRow = rowData;
+        axiomShovel.editingColumns = columns;
+        
+        $('#edit-modal-table').text(axiomShovel.currentTable);
+        
+        // First get the table structure to know column types
+        $.post(axiom_ajax.ajax_url, {
+            action: 'axiom_get_table_structure',
+            nonce: axiom_ajax.nonce,
+            table: axiomShovel.currentTable
+        })
+        .done(function(response) {
+            if (response.success) {
+                renderEditFields(rowData, columns, response.data);
+                $('#edit-row-modal').show();
+            } else {
+                showError('Failed to load column information');
+            }
+        })
+        .fail(function() {
+            showError('Failed to communicate with server');
+        });
+    }
+    
+    function renderEditFields(rowData, columns, structure) {
+        const $container = $('#edit-fields-container');
+        $container.empty();
+        
+        // Create a map of column structure
+        const structureMap = {};
+        structure.forEach(function(col) {
+            structureMap[col.Field] = col;
+        });
+        
+        columns.forEach(function(column) {
+            const value = rowData[column];
+            const colStructure = structureMap[column] || {};
+            
+            const $row = $('<tr></tr>');
+            
+            // Column name cell
+            const $nameCell = $('<td></td>');
+            const $columnName = $('<div class="column-name"></div>').text(column);
+            $nameCell.append($columnName);
+            
+            if (colStructure.Key === 'PRI') {
+                $nameCell.append('<span class="primary-key-indicator">PRIMARY KEY</span>');
+            }
+            
+            $row.append($nameCell);
+            
+            // Column type cell
+            const $typeCell = $('<td class="column-type"></td>');
+            $typeCell.text(colStructure.Type || 'unknown');
+            $row.append($typeCell);
+            
+            // Value input cell
+            const $valueCell = $('<td></td>');
+            
+            // Determine input type based on column type
+            const isLongText = colStructure.Type && (
+                colStructure.Type.indexOf('text') !== -1 ||
+                colStructure.Type.indexOf('blob') !== -1 ||
+                colStructure.Type.indexOf('json') !== -1
+            );
+            
+            if (isLongText) {
+                const $textarea = $('<textarea></textarea>');
+                $textarea.attr('data-column', column);
+                $textarea.attr('data-original-value', value);
+                
+                if (value === null) {
+                    $textarea.val('');
+                    $textarea.attr('data-is-null', 'true');
+                } else {
+                    $textarea.val(value);
+                }
+                
+                $valueCell.append($textarea);
+            } else {
+                const $input = $('<input type="text">');
+                $input.attr('data-column', column);
+                $input.attr('data-original-value', value);
+                
+                if (value === null) {
+                    $input.val('');
+                    $input.attr('placeholder', 'NULL');
+                    $input.attr('data-is-null', 'true');
+                } else {
+                    $input.val(value);
+                }
+                
+                $valueCell.append($input);
+            }
+            
+            // Add NULL checkbox if column allows NULL
+            if (colStructure.Null === 'YES') {
+                const $nullDiv = $('<div class="null-checkbox"></div>');
+                const $checkbox = $('<input type="checkbox">');
+                $checkbox.attr('id', 'null-' + column);
+                $checkbox.attr('data-column', column);
+                
+                if (value === null) {
+                    $checkbox.prop('checked', true);
+                }
+                
+                $checkbox.on('change', function() {
+                    const isChecked = $(this).prop('checked');
+                    const $field = $valueCell.find('input[type="text"], textarea');
+                    
+                    if (isChecked) {
+                        $field.val('');
+                        $field.attr('placeholder', 'NULL');
+                        $field.attr('data-is-null', 'true');
+                        $field.prop('disabled', true);
+                    } else {
+                        $field.attr('placeholder', '');
+                        $field.attr('data-is-null', 'false');
+                        $field.prop('disabled', false);
+                        $field.focus();
+                    }
+                });
+                
+                const $label = $('<label></label>');
+                $label.attr('for', 'null-' + column);
+                $label.text('Set as NULL');
+                
+                $nullDiv.append($checkbox).append($label);
+                $valueCell.append($nullDiv);
+                
+                // Disable input if NULL is checked
+                if (value === null) {
+                    $valueCell.find('input[type="text"], textarea').prop('disabled', true);
+                }
+            }
+            
+            $row.append($valueCell);
+            $container.append($row);
+        });
+    }
+    
+    $('#close-edit-modal, #cancel-edit-btn').on('click', function() {
+        $('#edit-row-modal').hide();
+        axiomShovel.editingRow = null;
+        axiomShovel.editingColumns = null;
+    });
+    
+    $('#edit-row-modal').on('click', function(e) {
+        if ($(e.target).is('#edit-row-modal')) {
+            $('#edit-row-modal').hide();
+            axiomShovel.editingRow = null;
+            axiomShovel.editingColumns = null;
+        }
+    });
+    
+    $('#save-row-btn').on('click', function() {
+        const $btn = $(this);
+        $btn.prop('disabled', true).text('Saving...');
+        
+        // Collect the updated values
+        const updatedData = {};
+        const originalData = {};
+        let hasChanges = false;
+        
+        $('#edit-fields-container tr').each(function() {
+            const $row = $(this);
+            const $field = $row.find('input[type="text"], textarea');
+            const column = $field.attr('data-column');
+            const originalValue = $field.attr('data-original-value');
+            const isNull = $field.attr('data-is-null') === 'true';
+            
+            let newValue;
+            if (isNull) {
+                newValue = null;
+            } else {
+                newValue = $field.val();
+            }
+            
+            // Store original value for WHERE clause
+            originalData[column] = originalValue === 'null' || originalValue === '' && $field.attr('placeholder') === 'NULL' ? null : originalValue;
+            
+            // Check if value has changed
+            if (newValue !== originalValue) {
+                hasChanges = true;
+            }
+            
+            updatedData[column] = newValue;
+        });
+        
+        if (!hasChanges) {
+            showMessage('No changes to save', 'info');
+            $btn.prop('disabled', false).text('Save Changes');
+            return;
+        }
+        
+        // Send update request
+        $.post(axiom_ajax.ajax_url, {
+            action: 'axiom_update_row',
+            nonce: axiom_ajax.nonce,
+            table: axiomShovel.currentTable,
+            original_data: JSON.stringify(originalData),
+            updated_data: JSON.stringify(updatedData)
+        })
+        .done(function(response) {
+            if (response.success) {
+                showMessage('Row updated successfully', 'success');
+                $('#edit-row-modal').hide();
+                axiomShovel.editingRow = null;
+                axiomShovel.editingColumns = null;
+                
+                // Reload the table data
+                if (axiomShovel.searchQuery) {
+                    searchTableData();
+                } else {
+                    loadTableData();
+                }
+            } else {
+                showError('Failed to update row: ' + response.data);
+            }
+        })
+        .fail(function() {
+            showError('Failed to communicate with server');
+        })
+        .always(function() {
+            $btn.prop('disabled', false).text('Save Changes');
+        });
+    });
 });
