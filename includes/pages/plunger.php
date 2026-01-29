@@ -385,10 +385,8 @@ jQuery(document).ready(function($) {
                     $('#crunchy-box').val('Some statements failed. Check execution results above for details.');
                 }
                 
-                // Refresh the page after 5 seconds to update recent operations
-                setTimeout(function() {
-                    location.reload();
-                }, 5000);
+                // Note: Removed automatic page reload to preserve crunchy box contents
+                // User can manually refresh if they want to see updated recent operations
             },
             error: function() {
                 $('#sql-loading').hide();
