@@ -228,21 +228,61 @@ jQuery(document).ready(function($) {
         
         var actualPrefix = '<?php global $wpdb; echo $wpdb->prefix; ?>';
         
-        // Pattern to match table names with wp_ prefix
+        // Comprehensive patterns for table name contexts only
         var patterns = [
+            // DDL Operations
+            /\b(CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?)wp_(\w+)/gi,
+            /\b(DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?)wp_(\w+)/gi,
             /\b(ALTER\s+TABLE\s+)wp_(\w+)/gi,
-            /\b(FROM\s+)wp_(\w+)/gi, 
+            /\b(TRUNCATE\s+(?:TABLE\s+)?)wp_(\w+)/gi,
+            
+            // DML Operations  
+            /\b(FROM\s+)wp_(\w+)/gi,
             /\b(JOIN\s+)wp_(\w+)/gi,
+            /\b((?:LEFT|RIGHT|INNER|OUTER|CROSS)\s+JOIN\s+)wp_(\w+)/gi,
             /\b(INTO\s+)wp_(\w+)/gi,
+            /\b(INSERT\s+INTO\s+)wp_(\w+)/gi,
+            /\b(REPLACE\s+INTO\s+)wp_(\w+)/gi,
             /\b(UPDATE\s+)wp_(\w+)/gi,
-            /\b(INDEX\s+\w+\s+ON\s+)wp_(\w+)/gi,
-            /\b(SHOW\s+COLUMNS\s+FROM\s+)wp_(\w+)/gi,
+            /\b(DELETE\s+FROM\s+)wp_(\w+)/gi,
+            
+            // Index Operations
+            /\b(CREATE\s+(?:UNIQUE\s+)?INDEX\s+\w+\s+ON\s+)wp_(\w+)/gi,
+            /\b(DROP\s+INDEX\s+\w+\s+ON\s+)wp_(\w+)/gi,
+            /\b(ADD\s+(?:UNIQUE\s+)?(?:INDEX|KEY)\s+\w+\s+ON\s+)wp_(\w+)/gi,
+            
+            // Information Schema Queries
+            /\b(SHOW\s+(?:COLUMNS|FIELDS)\s+FROM\s+)wp_(\w+)/gi,
+            /\b(SHOW\s+(?:INDEX|INDEXES|KEYS)\s+FROM\s+)wp_(\w+)/gi,
             /\b(DESCRIBE\s+)wp_(\w+)/gi,
-            /\b(DESC\s+)wp_(\w+)/gi
+            /\b(DESC\s+)wp_(\w+)/gi,
+            /\b(EXPLAIN\s+)wp_(\w+)/gi,
+            
+            // Information Schema with quotes
+            /\b(SHOW\s+TABLES\s+LIKE\s+['\"])wp_/gi,
+            
+            // Backticked table names
+            /(`)(wp_)(\w+)(`)/gi,
+            
+            // Table references in constraints
+            /\b(REFERENCES\s+)wp_(\w+)/gi,
+            /\b(CONSTRAINT\s+\w+\s+FOREIGN\s+KEY\s+.*?\s+REFERENCES\s+)wp_(\w+)/gi
         ];
         
+        // Apply each pattern
         patterns.forEach(function(pattern) {
-            sql = sql.replace(pattern, '$1' + actualPrefix + '$2');
+            if (pattern.source.includes('SHOW.*TABLES.*LIKE')) {
+                // Special handling for LIKE patterns - replace wp_ with actualPrefix
+                sql = sql.replace(pattern, function(match, p1) {
+                    return p1 + actualPrefix;
+                });
+            } else if (pattern.source.includes('`.*wp_.*`')) {
+                // Special handling for backticked names
+                sql = sql.replace(pattern, '$1' + actualPrefix + '$3$4');
+            } else {
+                // Standard replacement
+                sql = sql.replace(pattern, '$1' + actualPrefix + '$2');
+            }
         });
         
         return sql;
