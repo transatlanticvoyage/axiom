@@ -15,6 +15,11 @@ class Axiom_Admin {
         add_action('wp_ajax_axiom_refresh_registry', array($this, 'ajax_refresh_registry'));
         add_action('wp_ajax_axiom_rebuild_table', array($this, 'ajax_rebuild_table'));
         add_action('wp_ajax_axiom_execute_sql', array($this, 'ajax_execute_sql'));
+        
+        // Axiom Icepick AJAX handlers
+        add_action('wp_ajax_axiom_icepick_validate', array($this, 'ajax_icepick_validate'));
+        add_action('wp_ajax_axiom_icepick_read', array($this, 'ajax_icepick_read'));
+        add_action('wp_ajax_axiom_icepick_update', array($this, 'ajax_icepick_update'));
     }
     
     /**
@@ -84,6 +89,24 @@ class Axiom_Admin {
             'manage_options',
             'axiomvenlazar',
             array($this, 'display_venlazar_page')
+        );
+        
+        add_submenu_page(
+            'axiom-dashboard',
+            'Axiom Icepick Editor',
+            'Axiom Icepick Editor',
+            'manage_options',
+            'axiom_icepick',
+            array($this, 'display_icepick_page')
+        );
+        
+        add_submenu_page(
+            'axiom-dashboard',
+            'Axiom Image ID Finder',
+            'Axiom Image ID Finder',
+            'manage_options',
+            'axiom_image_id_finder',
+            array($this, 'display_image_id_finder_page')
         );
     }
     
@@ -177,6 +200,68 @@ class Axiom_Admin {
      */
     public function display_venlazar_page() {
         include AXIOM_PLUGIN_PATH . 'includes/pages/venlazar.php';
+    }
+    
+    /**
+     * Display Axiom Icepick page with aggressive notice suppression
+     */
+    public function display_icepick_page() {
+        // Aggressive admin notice suppression
+        add_action('admin_print_styles', function() {
+            remove_all_actions('admin_notices');
+            remove_all_actions('all_admin_notices');
+            remove_all_actions('network_admin_notices');
+            remove_all_actions('user_admin_notices');
+            
+            // Remove specific plugin notices
+            remove_all_actions('admin_notices', 10);
+            remove_all_actions('admin_notices', 20);
+            
+            // Hide notices with CSS as backup
+            echo '<style>
+                .notice, .notice-error, .notice-warning, .notice-success, .notice-info,
+                .update-nag, .updated, .error, .is-dismissible, .wp-core-ui .notice {
+                    display: none !important;
+                }
+            </style>';
+        }, 1);
+        
+        // Additional suppression before page loads
+        remove_all_actions('admin_notices');
+        remove_all_actions('all_admin_notices');
+        
+        include AXIOM_PLUGIN_PATH . 'includes/pages/icepick.php';
+    }
+    
+    /**
+     * Display Image ID Finder page
+     */
+    public function display_image_id_finder_page() {
+        // Aggressive admin notice suppression
+        add_action('admin_print_styles', function() {
+            remove_all_actions('admin_notices');
+            remove_all_actions('all_admin_notices');
+            remove_all_actions('network_admin_notices');
+            remove_all_actions('user_admin_notices');
+            
+            // Remove specific plugin notices
+            remove_all_actions('admin_notices', 10);
+            remove_all_actions('admin_notices', 20);
+            
+            // Hide notices with CSS as backup
+            echo '<style>
+                .notice, .notice-error, .notice-warning, .notice-success, .notice-info,
+                .update-nag, .updated, .error, .is-dismissible, .wp-core-ui .notice {
+                    display: none !important;
+                }
+            </style>';
+        }, 1);
+        
+        // Additional suppression before page loads
+        remove_all_actions('admin_notices');
+        remove_all_actions('all_admin_notices');
+        
+        include AXIOM_PLUGIN_PATH . 'includes/pages/image-id-finder.php';
     }
     
     /**
@@ -473,5 +558,270 @@ class Axiom_Admin {
                 'has_errors' => true
             ));
         }
+    }
+    
+    /**
+     * AJAX: Icepick Validate Table/Row/Column
+     */
+    public function ajax_icepick_validate() {
+        check_ajax_referer('axiom_icepick_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        global $wpdb;
+        
+        $table = sanitize_text_field($_POST['table']);
+        $row_id = sanitize_text_field($_POST['row_id']);
+        $column = sanitize_text_field($_POST['column']);
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var($wpdb->prepare(
+            "SHOW TABLES LIKE %s",
+            $table
+        ));
+        
+        if (!$table_exists) {
+            wp_send_json_error("Table '{$table}' does not exist");
+        }
+        
+        // Get table structure to find primary key
+        $columns = $wpdb->get_results("SHOW COLUMNS FROM `{$table}`");
+        $primary_key = null;
+        $column_exists = false;
+        
+        foreach ($columns as $col) {
+            if ($col->Key === 'PRI') {
+                $primary_key = $col->Field;
+            }
+            if ($col->Field === $column) {
+                $column_exists = true;
+            }
+        }
+        
+        if (!$column_exists) {
+            wp_send_json_error("Column '{$column}' does not exist in table '{$table}'");
+        }
+        
+        if (!$primary_key) {
+            // Try common primary key names
+            $common_keys = array('id', 'ID', $table . '_id', str_replace($wpdb->prefix, '', $table) . '_id');
+            foreach ($common_keys as $key) {
+                if ($wpdb->get_var("SHOW COLUMNS FROM `{$table}` WHERE Field = '{$key}'")) {
+                    $primary_key = $key;
+                    break;
+                }
+            }
+            
+            if (!$primary_key) {
+                wp_send_json_error("Could not determine primary key for table '{$table}'");
+            }
+        }
+        
+        // Check if row exists
+        $row_exists = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$table}` WHERE `{$primary_key}` = %s",
+            $row_id
+        ));
+        
+        if (!$row_exists) {
+            wp_send_json_error("Row with {$primary_key}='{$row_id}' does not exist in table '{$table}'");
+        }
+        
+        wp_send_json_success(array(
+            'message' => "Validation successful! Table: {$table}, Row: {$row_id} (PK: {$primary_key}), Column: {$column} - All exist and are accessible."
+        ));
+    }
+    
+    /**
+     * AJAX: Icepick Read Value
+     */
+    public function ajax_icepick_read() {
+        check_ajax_referer('axiom_icepick_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        global $wpdb;
+        
+        $table = sanitize_text_field($_POST['table']);
+        $row_id = sanitize_text_field($_POST['row_id']);
+        $column = sanitize_text_field($_POST['column']);
+        
+        // Get primary key
+        $columns = $wpdb->get_results("SHOW COLUMNS FROM `{$table}`");
+        $primary_key = null;
+        
+        foreach ($columns as $col) {
+            if ($col->Key === 'PRI') {
+                $primary_key = $col->Field;
+                break;
+            }
+        }
+        
+        if (!$primary_key) {
+            // Try common primary key names
+            $common_keys = array('id', 'ID', $table . '_id', str_replace($wpdb->prefix, '', $table) . '_id');
+            foreach ($common_keys as $key) {
+                if ($wpdb->get_var("SHOW COLUMNS FROM `{$table}` WHERE Field = '{$key}'")) {
+                    $primary_key = $key;
+                    break;
+                }
+            }
+        }
+        
+        if (!$primary_key) {
+            wp_send_json_error("Could not determine primary key for table '{$table}'");
+        }
+        
+        // Get the value
+        $value = $wpdb->get_var($wpdb->prepare(
+            "SELECT `{$column}` FROM `{$table}` WHERE `{$primary_key}` = %s",
+            $row_id
+        ));
+        
+        if ($value === null && $wpdb->last_error) {
+            wp_send_json_error("Database error: " . $wpdb->last_error);
+        }
+        
+        // Handle serialized data
+        $display_value = $value;
+        if (is_serialized($value)) {
+            $unserialized = @unserialize($value);
+            if ($unserialized !== false) {
+                $display_value = "SERIALIZED DATA:\n" . print_r($unserialized, true);
+            }
+        }
+        
+        wp_send_json_success(array(
+            'table' => $table,
+            'row_id' => $row_id,
+            'column' => $column,
+            'primary_key' => $primary_key,
+            'value' => $display_value === null ? '(NULL)' : $display_value
+        ));
+    }
+    
+    /**
+     * AJAX: Icepick Update Value
+     */
+    public function ajax_icepick_update() {
+        check_ajax_referer('axiom_icepick_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        global $wpdb;
+        
+        $table = sanitize_text_field($_POST['table']);
+        $row_id = sanitize_text_field($_POST['row_id']);
+        $column = sanitize_text_field($_POST['column']);
+        $new_value = wp_unslash($_POST['new_value']); // Don't sanitize the value itself
+        
+        // Get primary key
+        $columns = $wpdb->get_results("SHOW COLUMNS FROM `{$table}`");
+        $primary_key = null;
+        
+        foreach ($columns as $col) {
+            if ($col->Key === 'PRI') {
+                $primary_key = $col->Field;
+                break;
+            }
+        }
+        
+        if (!$primary_key) {
+            // Try common primary key names
+            $common_keys = array('id', 'ID', $table . '_id', str_replace($wpdb->prefix, '', $table) . '_id');
+            foreach ($common_keys as $key) {
+                if ($wpdb->get_var("SHOW COLUMNS FROM `{$table}` WHERE Field = '{$key}'")) {
+                    $primary_key = $key;
+                    break;
+                }
+            }
+        }
+        
+        if (!$primary_key) {
+            wp_send_json_error("Could not determine primary key for table '{$table}'");
+        }
+        
+        // Get old value first
+        $old_value = $wpdb->get_var($wpdb->prepare(
+            "SELECT `{$column}` FROM `{$table}` WHERE `{$primary_key}` = %s",
+            $row_id
+        ));
+        
+        // Handle serialized data for display
+        $display_old_value = $old_value;
+        if (is_serialized($old_value)) {
+            $unserialized = @unserialize($old_value);
+            if ($unserialized !== false) {
+                $display_old_value = "SERIALIZED DATA:\n" . print_r($unserialized, true);
+            }
+        }
+        
+        // Check if new value should be serialized
+        $value_to_save = $new_value;
+        
+        // Try to detect if it's meant to be serialized (e.g., starts with a:, s:, etc.)
+        if (is_serialized($new_value)) {
+            // It's already serialized, use as is
+            $value_to_save = $new_value;
+        } elseif (is_serialized($old_value)) {
+            // Old value was serialized, so we might need to serialize the new value
+            // Try to parse as JSON first
+            $json_decoded = json_decode($new_value, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $value_to_save = serialize($json_decoded);
+            } else {
+                // If not JSON, just save as string (user might be intentionally changing to non-serialized)
+                $value_to_save = $new_value;
+            }
+        }
+        
+        // Update the value
+        $result = $wpdb->update(
+            $table,
+            array($column => $value_to_save),
+            array($primary_key => $row_id)
+        );
+        
+        if ($result === false) {
+            wp_send_json_error("Update failed: " . $wpdb->last_error);
+        }
+        
+        // Log the operation
+        $wpdb->insert(
+            $wpdb->prefix . 'axiom_operations',
+            array(
+                'operation_type' => 'icepick_update',
+                'target_plugin' => 'manual',
+                'target_table' => $table,
+                'operation_data' => json_encode(array(
+                    'table' => $table,
+                    'primary_key' => $primary_key,
+                    'row_id' => $row_id,
+                    'column' => $column,
+                    'old_value' => substr($old_value, 0, 1000),
+                    'new_value' => substr($new_value, 0, 1000)
+                )),
+                'status' => 'completed',
+                'user_id' => get_current_user_id(),
+                'created_at' => current_time('mysql'),
+                'completed_at' => current_time('mysql')
+            )
+        );
+        
+        wp_send_json_success(array(
+            'table' => $table,
+            'row_id' => $row_id,
+            'column' => $column,
+            'primary_key' => $primary_key,
+            'old_value' => $display_old_value === null ? '(NULL)' : $display_old_value,
+            'new_value' => $new_value,
+            'rows_affected' => $result
+        ));
     }
 }
