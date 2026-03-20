@@ -26,7 +26,6 @@ class Axiom_DB_Field_Discrepancy_Controller {
     private function load_dependencies() {
         require_once plugin_dir_path(__FILE__) . 'class-notice-suppressor.php';
         require_once plugin_dir_path(__FILE__) . 'class-page-renderer.php';
-        require_once plugin_dir_path(__FILE__) . 'class-ajax-handler.php';
     }
     
     /**

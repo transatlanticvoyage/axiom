@@ -598,7 +598,26 @@ class Axiom_DB_Field_Discrepancy_Page_Renderer {
                         }
                     },
                     error: function(xhr, status, error) {
-                        $('#sql-feedback-box').val('AJAX ERROR: ' + error + '\n\nStatus: ' + status);
+                        let errorDetails = 'AJAX ERROR: ' + error + '\n\n';
+                        errorDetails += 'Status: ' + status + '\n';
+                        errorDetails += 'Response Status: ' + xhr.status + '\n';
+                        errorDetails += 'Response Text: ' + xhr.responseText.substring(0, 500) + '\n';
+                        
+                        // Check if it's a common WordPress AJAX issue
+                        if (xhr.status === 0) {
+                            errorDetails += '\nPossible causes:\n';
+                            errorDetails += '- Network connection issue\n';
+                            errorDetails += '- Request blocked by security plugin\n';
+                            errorDetails += '- CORS issue (if on different domain)\n';
+                        } else if (xhr.status === 400) {
+                            errorDetails += '\nBad Request - check AJAX action name\n';
+                        } else if (xhr.status === 403) {
+                            errorDetails += '\nForbidden - check user permissions\n';
+                        } else if (xhr.status === 500) {
+                            errorDetails += '\nInternal Server Error - check PHP error logs\n';
+                        }
+                        
+                        $('#sql-feedback-box').val(errorDetails);
                         $button.prop('disabled', false).html('▶️ run sql');
                     }
                 });

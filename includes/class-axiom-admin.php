@@ -9,6 +9,9 @@ class Axiom_Admin {
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
         
+        // Initialize DB Field Discrepancy Checker AJAX handler early
+        add_action('admin_init', array($this, 'init_db_discrepancy_ajax'));
+        
         // AJAX handlers
         add_action('wp_ajax_axiom_health_check', array($this, 'ajax_health_check'));
         add_action('wp_ajax_axiom_sync_plugin', array($this, 'ajax_sync_plugin'));
@@ -271,6 +274,18 @@ class Axiom_Admin {
         remove_all_actions('all_admin_notices');
         
         include AXIOM_PLUGIN_PATH . 'includes/pages/image-id-finder.php';
+    }
+    
+    /**
+     * Initialize DB Field Discrepancy AJAX handler
+     */
+    public function init_db_discrepancy_ajax() {
+        // Load the AJAX handler class if it exists
+        $ajax_handler_file = AXIOM_PLUGIN_PATH . 'db-field-discrepancy-checker/class-ajax-handler.php';
+        if (file_exists($ajax_handler_file)) {
+            require_once $ajax_handler_file;
+            new Axiom_DB_Discrepancy_Ajax_Handler();
+        }
     }
     
     /**
