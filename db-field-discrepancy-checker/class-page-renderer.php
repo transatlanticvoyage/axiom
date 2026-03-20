@@ -228,8 +228,14 @@ class Axiom_DB_Field_Discrepancy_Page_Renderer {
                             
                             <!-- Pane 3: Columns to Add -->
                             <div style="background: white; border: 1px solid #ccc; border-radius: 4px;">
-                                <div style="background: #f0f0f1; padding: 12px; border-bottom: 1px solid #ccc;">
+                                <div style="background: #f0f0f1; padding: 12px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
                                     <div style="font-size: 16px; font-weight: bold;">db columns that must be added</div>
+                                    <button type="button"
+                                            id="run-sql-button"
+                                            style="padding: 6px 12px; background: #d63638; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: normal; transition: all 0.2s;"
+                                            disabled>
+                                        ▶️ run sql
+                                    </button>
                                 </div>
                                 <div style="padding: 12px;">
                                     <textarea id="columns-to-add-box" 
@@ -257,6 +263,21 @@ class Axiom_DB_Field_Discrepancy_Page_Renderer {
                                     style="padding: 10px 20px; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
                                 ✖ Close Splasher
                             </button>
+                        </div>
+                        
+                        <!-- SQL Execution Feedback Area -->
+                        <div id="sql-execution-feedback" style="margin-top: 20px; display: none;">
+                            <div style="background: white; border: 1px solid #ccc; border-radius: 4px;">
+                                <div style="background: #f0f0f1; padding: 12px; border-bottom: 1px solid #ccc;">
+                                    <div style="font-size: 16px; font-weight: bold;">SQL Execution Results</div>
+                                </div>
+                                <div style="padding: 12px;">
+                                    <textarea id="sql-feedback-box"
+                                              readonly
+                                              style="width: 100%; height: 200px; font-family: monospace; font-size: 12px; border: 1px solid #ddd; border-radius: 4px; padding: 8px; resize: vertical; background: #f9f9f9;"
+                                              placeholder="SQL execution results will appear here..."></textarea>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -290,6 +311,10 @@ class Axiom_DB_Field_Discrepancy_Page_Renderer {
         <script>
         jQuery(document).ready(function($) {
             console.log('DB Field Discrepancy Checker page loaded');
+            
+            // Store AJAX nonce
+            const ajaxNonce = '<?php echo wp_create_nonce('axiom_db_discrepancy_nonce'); ?>';
+            const ajaxUrl = '<?php echo admin_url('admin-ajax.php'); ?>';
             
             // Copy SQL to clipboard functionality
             $('.copy-sql-btn').on('click', function() {
@@ -371,6 +396,7 @@ class Axiom_DB_Field_Discrepancy_Page_Renderer {
             
             // View in Splasher functionality
             let currentTableData = {};
+            let currentAlterStatements = '';
             
             $('.view-splasher-btn').on('click', function() {
                 const $button = $(this);
@@ -438,11 +464,19 @@ class Axiom_DB_Field_Discrepancy_Page_Renderer {
                     const alterStatements = <?php echo json_encode($alter_statements); ?>;
                     $('#columns-to-add-box').val(alterStatements);
                     
-                    // Store for copy functionality
+                    // Store for copy and run functionality
                     currentTableData = {
                         tableName: tableName,
                         alterStatements: alterStatements
                     };
+                    currentAlterStatements = alterStatements;
+                    
+                    // Enable/disable run SQL button based on whether there are statements to run
+                    if (alterStatements && !alterStatements.includes('No missing columns')) {
+                        $('#run-sql-button').prop('disabled', false);
+                    } else {
+                        $('#run-sql-button').prop('disabled', true);
+                    }
                 }
                 <?php endforeach; ?>
             }
@@ -504,10 +538,122 @@ class Axiom_DB_Field_Discrepancy_Page_Renderer {
             // Close splasher
             $('#close-splasher').on('click', function() {
                 $('#splasher-interface').slideUp();
+                $('#sql-execution-feedback').slideUp();
                 // Clear the textboxes
-                $('#source-definition-box, #current-columns-box, #columns-to-add-box').val('');
+                $('#source-definition-box, #current-columns-box, #columns-to-add-box, #sql-feedback-box').val('');
                 $('#current-analyzing-table').text('-');
+                // Reset run SQL button
+                $('#run-sql-button').prop('disabled', true).html('▶️ run sql').css('background', '#d63638');
             });
+            
+            // Run SQL button functionality
+            $('#run-sql-button').on('click', function() {
+                const $button = $(this);
+                const tableName = $('#current-analyzing-table').text();
+                
+                if (!currentAlterStatements || currentAlterStatements.includes('No missing columns')) {
+                    alert('No SQL statements to execute.');
+                    return;
+                }
+                
+                if (!confirm('Are you sure you want to run these ALTER TABLE statements?\n\nThis will modify the database structure. Make sure you have a backup!')) {
+                    return;
+                }
+                
+                // Disable button and show loading state
+                $button.prop('disabled', true).html('⏳ Running...');
+                
+                // Show feedback area
+                $('#sql-execution-feedback').slideDown();
+                $('#sql-feedback-box').val('Executing SQL statements...\n\n');
+                
+                // Make AJAX request to run SQL
+                $.ajax({
+                    url: ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'axiom_run_alter_statements',
+                        nonce: ajaxNonce,
+                        sql: currentAlterStatements,
+                        table_name: tableName
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            displaySQLResults(response.data);
+                            
+                            // If all successful, disable the button
+                            if (response.data.status === 'success') {
+                                $button.html('✓ Completed').css('background', '#00a32a');
+                                // Refresh the splasher to show updated state
+                                setTimeout(function() {
+                                    $('#refresh-splasher').click();
+                                }, 2000);
+                            } else {
+                                // Re-enable for retry
+                                $button.prop('disabled', false).html('▶️ run sql');
+                            }
+                        } else {
+                            $('#sql-feedback-box').val('ERROR: ' + (response.data || 'Unknown error occurred'));
+                            $button.prop('disabled', false).html('▶️ run sql');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        $('#sql-feedback-box').val('AJAX ERROR: ' + error + '\n\nStatus: ' + status);
+                        $button.prop('disabled', false).html('▶️ run sql');
+                    }
+                });
+            });
+            
+            function displaySQLResults(data) {
+                let output = '=== SQL EXECUTION RESULTS ===\n';
+                output += '\n' + data.message + '\n';
+                output += '\n' + data.summary + '\n';
+                output += '\n=== DETAILED RESULTS ===\n\n';
+                
+                if (data.details && data.details.length > 0) {
+                    data.details.forEach(function(detail) {
+                        const statusIcon = detail.status === 'success' ? '✓' : 
+                                          detail.status === 'error' ? '✗' : 
+                                          detail.status === 'skipped' ? '⚠' : '?';
+                        
+                        output += 'Statement #' + detail.statement_num + ': ' + statusIcon + ' ' + detail.status.toUpperCase() + '\n';
+                        output += 'SQL: ' + detail.statement + '\n';
+                        output += 'Result: ' + detail.message + '\n';
+                        output += '---\n\n';
+                    });
+                }
+                
+                output += '=== END OF RESULTS ===\n';
+                output += '\nExecution completed at: ' + new Date().toLocaleString();
+                
+                $('#sql-feedback-box').val(output);
+                
+                // Scroll feedback box to bottom
+                const feedbackBox = document.getElementById('sql-feedback-box');
+                feedbackBox.scrollTop = feedbackBox.scrollHeight;
+            }
+            
+            // Add hover effect to run SQL button
+            $('#run-sql-button').hover(
+                function() {
+                    if (!$(this).prop('disabled')) {
+                        $(this).css({
+                            'background': '#b32d2e',
+                            'transform': 'translateY(-1px)',
+                            'box-shadow': '0 2px 4px rgba(0,0,0,0.2)'
+                        });
+                    }
+                },
+                function() {
+                    if (!$(this).prop('disabled') && !$(this).text().includes('Completed')) {
+                        $(this).css({
+                            'background': '#d63638',
+                            'transform': 'translateY(0)',
+                            'box-shadow': 'none'
+                        });
+                    }
+                }
+            );
             
             // Add hover effect to view splasher buttons
             $('.view-splasher-btn').hover(
