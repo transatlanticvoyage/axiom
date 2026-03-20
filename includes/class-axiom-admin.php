@@ -108,6 +108,15 @@ class Axiom_Admin {
             'axiom_image_id_finder',
             array($this, 'display_image_id_finder_page')
         );
+        
+        add_submenu_page(
+            'axiom-dashboard',
+            'DB Field Discrepancy Checker',
+            'DB Field Discrepancy Checker',
+            'manage_options',
+            'db-field-discrepancy-checker',
+            array($this, 'display_db_field_discrepancy_page')
+        );
     }
     
     /**
@@ -262,6 +271,18 @@ class Axiom_Admin {
         remove_all_actions('all_admin_notices');
         
         include AXIOM_PLUGIN_PATH . 'includes/pages/image-id-finder.php';
+    }
+    
+    /**
+     * Display DB Field Discrepancy Checker page
+     */
+    public function display_db_field_discrepancy_page() {
+        // Load and initialize the controller
+        require_once AXIOM_PLUGIN_PATH . 'db-field-discrepancy-checker/class-db-field-discrepancy-controller.php';
+        
+        $controller = new Axiom_DB_Field_Discrepancy_Controller();
+        $controller->init_hooks();
+        $controller->render();
     }
     
     /**
