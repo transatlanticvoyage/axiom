@@ -647,9 +647,9 @@ class Axiom_DB_Field_Discrepancy_Page_Renderer {
                 
                 $('#sql-feedback-box').val(output);
                 
-                // Scroll feedback box to bottom
+                // Keep scroll at top (don't auto-scroll to bottom)
                 const feedbackBox = document.getElementById('sql-feedback-box');
-                feedbackBox.scrollTop = feedbackBox.scrollHeight;
+                feedbackBox.scrollTop = 0;
             }
             
             // Add hover effect to run SQL button
