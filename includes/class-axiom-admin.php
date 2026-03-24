@@ -120,6 +120,15 @@ class Axiom_Admin {
             'db-field-discrepancy-checker',
             array($this, 'display_db_field_discrepancy_page')
         );
+        
+        add_submenu_page(
+            'axiom-dashboard',
+            'Site Pruner Deluxe',
+            'Site Pruner Deluxe',
+            'manage_options',
+            'site-pruner-deluxe',
+            array($this, 'display_site_pruner_deluxe_page')
+        );
     }
     
     /**
@@ -296,6 +305,18 @@ class Axiom_Admin {
         require_once AXIOM_PLUGIN_PATH . 'db-field-discrepancy-checker/class-db-field-discrepancy-controller.php';
         
         $controller = new Axiom_DB_Field_Discrepancy_Controller();
+        $controller->init_hooks();
+        $controller->render();
+    }
+    
+    /**
+     * Display Site Pruner Deluxe page with aggressive notice suppression
+     */
+    public function display_site_pruner_deluxe_page() {
+        // Load and initialize the controller
+        require_once AXIOM_PLUGIN_PATH . 'site_pruner_deluxe/class-site-pruner-deluxe-controller.php';
+        
+        $controller = new Axiom_Site_Pruner_Deluxe_Controller();
         $controller->init_hooks();
         $controller->render();
     }
