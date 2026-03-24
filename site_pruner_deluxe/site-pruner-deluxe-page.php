@@ -96,8 +96,8 @@ add_action('admin_head', function() {
         }
         
         .pruner-textarea {
-            width: 100%;
-            height: 400px; /* Increased from 200px */
+            width: 500px;
+            height: 500px;
             padding: 15px;
             border: 2px solid #ddd;
             border-radius: 6px;
