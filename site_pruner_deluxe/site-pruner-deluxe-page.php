@@ -97,57 +97,95 @@ add_action('admin_head', function() {
         
         .pruner-textarea {
             width: 100%;
-            height: 200px;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            height: 400px; /* Increased from 200px */
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
             font-family: monospace;
-            font-size: 13px;
-            line-height: 1.4;
+            font-size: 14px;
+            line-height: 1.5;
             resize: vertical;
+            background: #f9f9f9;
+            transition: border-color 0.3s;
+        }
+        
+        .pruner-textarea:focus {
+            border-color: #0073aa;
+            background: #fff;
+            outline: none;
         }
         
         .pruner-button {
-            background: #0073aa;
+            background: linear-gradient(135deg, #0085ba 0%, #0073aa 100%);
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
+            padding: 14px 28px; /* Increased padding */
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: background-color 0.3s;
+            font-size: 16px; /* Increased font size */
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 115, 170, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .pruner-button:hover {
-            background: #005a87;
+            background: linear-gradient(135deg, #0073aa 0%, #005a87 100%);
+            box-shadow: 0 4px 8px rgba(0, 115, 170, 0.4);
+            transform: translateY(-1px);
         }
         
         .pruner-button:disabled {
             background: #ccc;
             cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .pruner-button.success {
+            background: linear-gradient(135deg, #46b450 0%, #389e41 100%);
+        }
+        
+        .pruner-button.success:hover {
+            background: linear-gradient(135deg, #389e41 0%, #2d7f36 100%);
+            box-shadow: 0 4px 8px rgba(70, 180, 80, 0.4);
         }
         
         .pruner-button.danger {
-            background: #d63638;
+            background: linear-gradient(135deg, #dc3232 0%, #b32d2e 100%);
         }
         
         .pruner-button.danger:hover {
-            background: #b32d2e;
+            background: linear-gradient(135deg, #b32d2e 0%, #8e2424 100%);
+            box-shadow: 0 4px 8px rgba(220, 50, 50, 0.4);
+        }
+        
+        .pruner-button.small {
+            padding: 8px 16px;
+            font-size: 13px;
         }
         
         .pruner-results {
             background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            padding: 20px;
             margin-top: 15px;
-            font-family: monospace;
-            font-size: 12px;
-            line-height: 1.6;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.8;
             white-space: pre-wrap;
-            max-height: 400px;
+            min-height: 500px; /* Increased from max-height 400px */
+            max-height: 800px;
             overflow-y: auto;
+            background: #f9f9f9;
+        }
+        
+        .section-divider {
+            margin: 40px 0 30px 0;
+            border: 0;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #ddd 20%, #ddd 80%, transparent);
         }
         
         .radio-group {
@@ -208,6 +246,7 @@ STYLES;
     <div class="site-pruner-deluxe-content">
         
         <!-- PART 1: Page URL Input and Validation -->
+        <hr class="section-divider">
         <div class="pruner-section">
             <h3>📋 Part 1: Pages to Preserve</h3>
             <p>Enter page URLs, slugs, or permalinks (one per line) that you want to keep:</p>
@@ -218,13 +257,14 @@ grapes/
 Apple-facts
 https://dogs.com/bananas-now"></textarea>
             <br><br>
-            <button id="validate-pages" class="pruner-button">Validate Pages</button>
+            <button id="validate-pages" class="pruner-button success">Validate Pages</button>
             <span id="validate-spinner" class="spinner"></span>
             
             <div id="validation-results" class="pruner-results" style="display: none;"></div>
         </div>
         
         <!-- PART 2: Pruning Action Selection -->
+        <hr class="section-divider">
         <div class="pruner-section">
             <h3>⚙️ Part 2: Choose Pruning Action</h3>
             <p>Select what to do with pages/posts that are NOT on the preserve list:</p>
@@ -241,6 +281,7 @@ https://dogs.com/bananas-now"></textarea>
         </div>
         
         <!-- PART 3: Execute Pruning -->
+        <hr class="section-divider">
         <div class="pruner-section">
             <h3>🚨 Part 3: Execute Pruning Function</h3>
             
@@ -259,9 +300,24 @@ https://dogs.com/bananas-now"></textarea>
             <button id="execute-pruning" class="pruner-button danger" disabled>Execute Pruning Function</button>
             <span id="execute-spinner" class="spinner"></span>
             
-            <div id="execution-results" class="pruner-results" style="display: none;"></div>
+            <div id="execution-results-container" style="display: none; margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h4 style="margin: 0; color: #333;">📊 Execution Report</h4>
+                    <button id="copy-execution-report" class="pruner-button small">
+                        📋 Copy Report
+                    </button>
+                </div>
+                <div id="execution-results" class="pruner-results"></div>
+            </div>
         </div>
         
+    </div>
+    
+    <!-- Debug Information Panel -->
+    <div id="debug-panel" style="display: none; margin-top: 20px; padding: 20px; background: #fff5f5; border: 2px solid #ff0000; border-radius: 8px;">
+        <h3 style="color: #ff0000; margin-top: 0;">🐛 Debug Information</h3>
+        <pre id="debug-content" style="background: white; padding: 15px; border: 1px solid #ccc; max-height: 600px; overflow-y: auto; font-family: monospace; font-size: 13px; border-radius: 4px;"></pre>
+        <button id="copy-debug" class="pruner-button small" style="margin-top: 15px;">📋 Copy Debug Info</button>
     </div>
     
     <script>
@@ -269,6 +325,17 @@ https://dogs.com/bananas-now"></textarea>
         
         // Enable execute button only after successful validation
         var validationPassed = false;
+        var lastDebugInfo = {};
+        
+        // Copy debug info function
+        $('#copy-debug').on('click', function() {
+            var debugText = $('#debug-content').text();
+            navigator.clipboard.writeText(debugText).then(function() {
+                alert('Debug information copied to clipboard!');
+            }).catch(function(err) {
+                alert('Failed to copy: ' + err);
+            });
+        });
         
         // Validate Pages functionality
         $('#validate-pages').on('click', function() {
@@ -282,30 +349,160 @@ https://dogs.com/bananas-now"></textarea>
             $('#validate-spinner').show();
             $('#validate-pages').prop('disabled', true);
             $('#validation-results').hide().empty();
+            $('#debug-panel').hide();
+            
+            // Clear previous debug info
+            lastDebugInfo = {
+                timestamp: new Date().toISOString(),
+                request: {
+                    action: 'site_pruner_validate_pages',
+                    pages_list: pagesToPreserve,
+                    pages_count: pagesToPreserve.split('\n').length,
+                    ajax_url: ajaxurl
+                }
+            };
+            
+            console.log('Sending validation request:', lastDebugInfo.request);
             
             $.ajax({
                 url: ajaxurl,
                 type: 'POST',
+                dataType: 'json',
                 data: {
                     action: 'site_pruner_validate_pages',
                     pages_list: pagesToPreserve,
                     nonce: '<?php echo wp_create_nonce("site_pruner_nonce"); ?>'
                 },
-                success: function(response) {
+                success: function(response, textStatus, jqXHR) {
                     $('#validate-spinner').hide();
                     $('#validate-pages').prop('disabled', false);
-                    $('#validation-results').show().text(response.data);
                     
-                    if (response.success) {
-                        validationPassed = true;
-                        $('#execute-pruning').prop('disabled', false);
+                    console.log('Validation response:', response);
+                    
+                    // Update debug info
+                    lastDebugInfo.response = response;
+                    lastDebugInfo.textStatus = textStatus;
+                    lastDebugInfo.httpStatus = jqXHR.status;
+                    lastDebugInfo.responseHeaders = jqXHR.getAllResponseHeaders();
+                    
+                    if (response && response.data) {
+                        $('#validation-results').show().text(response.data);
+                        
+                        if (response.success) {
+                            validationPassed = true;
+                            $('#execute-pruning').prop('disabled', false);
+                        } else {
+                            // Show debug panel on failure
+                            showDebugInfo('Validation failed with success=false');
+                        }
+                    } else {
+                        $('#validation-results').show().text('Invalid response format from server.');
+                        showDebugInfo('Invalid response format');
                     }
                 },
-                error: function() {
+                error: function(jqXHR, textStatus, errorThrown) {
                     $('#validate-spinner').hide();
                     $('#validate-pages').prop('disabled', false);
-                    $('#validation-results').show().text('Error occurred during validation.');
+                    
+                    console.error('AJAX Error:', textStatus, errorThrown);
+                    console.error('Response:', jqXHR.responseText);
+                    
+                    // Collect detailed error information
+                    lastDebugInfo.error = {
+                        textStatus: textStatus,
+                        errorThrown: errorThrown,
+                        httpStatus: jqXHR.status,
+                        statusText: jqXHR.statusText,
+                        responseText: jqXHR.responseText,
+                        responseHeaders: jqXHR.getAllResponseHeaders()
+                    };
+                    
+                    // Try to parse response if it's JSON
+                    try {
+                        if (jqXHR.responseText) {
+                            var jsonResponse = JSON.parse(jqXHR.responseText);
+                            lastDebugInfo.parsedResponse = jsonResponse;
+                        }
+                    } catch(e) {
+                        lastDebugInfo.parseError = e.message;
+                    }
+                    
+                    // Check for common issues
+                    var errorMessage = 'Error occurred during validation.';
+                    
+                    if (jqXHR.status === 0) {
+                        errorMessage += ' (Network error - check connection)';
+                        lastDebugInfo.diagnosis = 'Network error - possibly CORS or connection issue';
+                    } else if (jqXHR.status === 404) {
+                        errorMessage += ' (404 - AJAX endpoint not found)';
+                        lastDebugInfo.diagnosis = 'WordPress AJAX endpoint not found - check if admin-ajax.php is accessible';
+                    } else if (jqXHR.status === 403) {
+                        errorMessage += ' (403 - Permission denied)';
+                        lastDebugInfo.diagnosis = 'Permission denied - check user capabilities and nonce';
+                    } else if (jqXHR.status === 500) {
+                        errorMessage += ' (500 - Server error)';
+                        lastDebugInfo.diagnosis = 'Server error - check PHP error logs';
+                    } else if (jqXHR.status === 302 || jqXHR.status === 301) {
+                        errorMessage += ' (Redirect detected - likely login required)';
+                        lastDebugInfo.diagnosis = 'Redirect detected - user might not be logged in';
+                    }
+                    
+                    $('#validation-results').show().html(
+                        '<span style="color: red;">' + errorMessage + '</span><br>' +
+                        '<small>Click "Show Debug Info" below for details</small>'
+                    );
+                    
+                    showDebugInfo('AJAX request failed');
                 }
+            });
+        });
+        
+        function showDebugInfo(message) {
+            lastDebugInfo.debugMessage = message;
+            lastDebugInfo.userAgent = navigator.userAgent;
+            lastDebugInfo.currentUrl = window.location.href;
+            lastDebugInfo.wpVersion = '<?php global $wp_version; echo $wp_version; ?>';
+            lastDebugInfo.phpVersion = '<?php echo phpversion(); ?>';
+            
+            var debugText = '=== SITE PRUNER DELUXE DEBUG INFO ===\n\n';
+            debugText += 'Message: ' + message + '\n';
+            debugText += 'Timestamp: ' + lastDebugInfo.timestamp + '\n';
+            debugText += 'WP Version: ' + lastDebugInfo.wpVersion + '\n';
+            debugText += 'PHP Version: ' + lastDebugInfo.phpVersion + '\n';
+            debugText += 'Current URL: ' + lastDebugInfo.currentUrl + '\n';
+            debugText += 'User Agent: ' + lastDebugInfo.userAgent + '\n\n';
+            debugText += '--- REQUEST INFO ---\n';
+            debugText += JSON.stringify(lastDebugInfo.request, null, 2) + '\n\n';
+            
+            if (lastDebugInfo.error) {
+                debugText += '--- ERROR INFO ---\n';
+                debugText += JSON.stringify(lastDebugInfo.error, null, 2) + '\n\n';
+            }
+            
+            if (lastDebugInfo.response) {
+                debugText += '--- RESPONSE INFO ---\n';
+                debugText += JSON.stringify(lastDebugInfo.response, null, 2) + '\n\n';
+            }
+            
+            if (lastDebugInfo.diagnosis) {
+                debugText += '--- DIAGNOSIS ---\n';
+                debugText += lastDebugInfo.diagnosis + '\n\n';
+            }
+            
+            debugText += '--- FULL DEBUG OBJECT ---\n';
+            debugText += JSON.stringify(lastDebugInfo, null, 2);
+            
+            $('#debug-content').text(debugText);
+            $('#debug-panel').show();
+        }
+        
+        // Copy execution report functionality
+        $('#copy-execution-report').on('click', function() {
+            var reportText = $('#execution-results').text();
+            navigator.clipboard.writeText(reportText).then(function() {
+                alert('Execution report copied to clipboard!');
+            }).catch(function(err) {
+                alert('Failed to copy: ' + err);
             });
         });
         
@@ -325,11 +522,15 @@ https://dogs.com/bananas-now"></textarea>
             
             $('#execute-spinner').show();
             $('#execute-pruning').prop('disabled', true);
-            $('#execution-results').hide().empty();
+            $('#execution-results-container').hide();
+            $('#execution-results').empty();
+            
+            console.log('Executing pruning with action:', pruningAction);
             
             $.ajax({
                 url: ajaxurl,
                 type: 'POST',
+                dataType: 'json',
                 data: {
                     action: 'site_pruner_execute_pruning',
                     pages_list: pagesToPreserve,
@@ -339,12 +540,32 @@ https://dogs.com/bananas-now"></textarea>
                 success: function(response) {
                     $('#execute-spinner').hide();
                     $('#execute-pruning').prop('disabled', false);
-                    $('#execution-results').show().text(response.data);
+                    
+                    console.log('Execution response:', response);
+                    
+                    if (response && response.data) {
+                        $('#execution-results').text(response.data);
+                        $('#execution-results-container').show();
+                    } else {
+                        $('#execution-results').text('Invalid response format from server.');
+                        $('#execution-results-container').show();
+                    }
                 },
-                error: function() {
+                error: function(jqXHR, textStatus, errorThrown) {
                     $('#execute-spinner').hide();
                     $('#execute-pruning').prop('disabled', false);
-                    $('#execution-results').show().text('Error occurred during pruning execution.');
+                    
+                    console.error('Execution AJAX Error:', textStatus, errorThrown);
+                    console.error('Response:', jqXHR.responseText);
+                    
+                    var errorMessage = 'Error occurred during pruning execution.\n\n';
+                    errorMessage += 'Status: ' + jqXHR.status + ' ' + jqXHR.statusText + '\n';
+                    if (jqXHR.responseText) {
+                        errorMessage += 'Response: ' + jqXHR.responseText;
+                    }
+                    
+                    $('#execution-results').text(errorMessage);
+                    $('#execution-results-container').show();
                 }
             });
         });

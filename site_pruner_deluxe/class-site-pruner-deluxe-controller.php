@@ -79,23 +79,100 @@ class Axiom_Site_Pruner_Deluxe_Controller {
      * Validates the list of pages/URLs provided by user
      */
     public function ajax_validate_pages() {
-        // Security check
-        check_ajax_referer('site_pruner_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error('Insufficient permissions');
+        try {
+            // Enable error reporting for debugging
+            error_reporting(E_ALL);
+            ini_set('display_errors', 0); // Don't display, but log
+            
+            // Start collecting debug info
+            $debug_info = array(
+                'timestamp' => current_time('mysql'),
+                'user_id' => get_current_user_id(),
+                'user_login' => wp_get_current_user()->user_login,
+                'user_capabilities' => wp_get_current_user()->allcaps,
+                'post_data' => $_POST,
+                'php_version' => phpversion(),
+                'wp_version' => get_bloginfo('version'),
+                'memory_limit' => ini_get('memory_limit'),
+                'max_execution_time' => ini_get('max_execution_time')
+            );
+            
+            // Security check
+            if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'site_pruner_nonce')) {
+                $error_msg = 'Security check failed - nonce verification failed';
+                error_log('Site Pruner Deluxe: ' . $error_msg);
+                $debug_info['error'] = $error_msg;
+                $debug_info['nonce_provided'] = isset($_POST['nonce']) ? $_POST['nonce'] : 'not provided';
+                wp_send_json_error(array(
+                    'message' => $error_msg,
+                    'debug' => $debug_info
+                ));
+                return;
+            }
+            
+            if (!current_user_can('manage_options')) {
+                $error_msg = 'Insufficient permissions - user cannot manage_options';
+                error_log('Site Pruner Deluxe: ' . $error_msg);
+                $debug_info['error'] = $error_msg;
+                wp_send_json_error(array(
+                    'message' => $error_msg,
+                    'debug' => $debug_info
+                ));
+                return;
+            }
+            
+            if (!isset($_POST['pages_list'])) {
+                $error_msg = 'No pages_list parameter provided';
+                error_log('Site Pruner Deluxe: ' . $error_msg);
+                $debug_info['error'] = $error_msg;
+                wp_send_json_error(array(
+                    'message' => $error_msg,
+                    'debug' => $debug_info
+                ));
+                return;
+            }
+            
+            $pages_list = sanitize_textarea_field($_POST['pages_list']);
+            $pages_array = array_filter(array_map('trim', explode("\n", $pages_list)));
+            
+            $debug_info['pages_count'] = count($pages_array);
+            $debug_info['pages_sample'] = array_slice($pages_array, 0, 5); // First 5 pages for debug
+            
+            if (empty($pages_array)) {
+                $error_msg = 'No valid pages found after processing';
+                error_log('Site Pruner Deluxe: ' . $error_msg);
+                $debug_info['error'] = $error_msg;
+                $debug_info['raw_pages_list'] = $pages_list;
+                wp_send_json_error(array(
+                    'message' => $error_msg,
+                    'debug' => $debug_info
+                ));
+                return;
+            }
+            
+            // Log the validation attempt
+            error_log('Site Pruner Deluxe: Validating ' . count($pages_array) . ' pages for user ' . wp_get_current_user()->user_login);
+            
+            $results = $this->validate_page_list($pages_array);
+            
+            // Add debug info to results
+            $debug_info['validation_completed'] = true;
+            
+            wp_send_json_success($results);
+            
+        } catch (Exception $e) {
+            $error_msg = 'Exception caught: ' . $e->getMessage();
+            error_log('Site Pruner Deluxe Exception: ' . $error_msg);
+            error_log('Site Pruner Deluxe Stack Trace: ' . $e->getTraceAsString());
+            
+            wp_send_json_error(array(
+                'message' => $error_msg,
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+                'debug' => isset($debug_info) ? $debug_info : array()
+            ));
         }
-        
-        $pages_list = sanitize_textarea_field($_POST['pages_list']);
-        $pages_array = array_filter(array_map('trim', explode("\n", $pages_list)));
-        
-        if (empty($pages_array)) {
-            wp_send_json_error('No pages provided for validation');
-        }
-        
-        $results = $this->validate_page_list($pages_array);
-        
-        wp_send_json_success($results);
     }
     
     /**
@@ -104,52 +181,88 @@ class Axiom_Site_Pruner_Deluxe_Controller {
     private function validate_page_list($pages_array) {
         global $wpdb;
         
-        $found_pages = array();
-        $not_found_pages = array();
-        $home_url = home_url();
-        $site_url = site_url();
-        
-        foreach ($pages_array as $page_input) {
-            $page_input = trim($page_input);
-            if (empty($page_input)) continue;
+        try {
+            $found_pages = array();
+            $not_found_pages = array();
+            $errors_encountered = array();
+            $home_url = home_url();
+            $site_url = site_url();
             
-            // Clean up the input - remove leading/trailing slashes and extract slug
-            $slug = $this->extract_slug_from_input($page_input);
-            
-            if (empty($slug)) {
-                $not_found_pages[] = array(
-                    'input' => $page_input,
-                    'reason' => 'Invalid URL format'
-                );
-                continue;
+            // Check database connection
+            if (!$wpdb->check_connection()) {
+                throw new Exception('Database connection lost');
             }
             
-            // Look for the page in database (case insensitive)
-            $post = $wpdb->get_row($wpdb->prepare("
-                SELECT ID, post_title, post_name, post_type, post_status, post_parent
-                FROM {$wpdb->posts} 
-                WHERE LOWER(post_name) = LOWER(%s) 
-                AND post_status IN ('publish', 'draft', 'private', 'pending')
-                ORDER BY post_status = 'publish' DESC
-                LIMIT 1
-            ", $slug));
+            // Get database prefix for debugging
+            $db_prefix = $wpdb->prefix;
+            error_log("Site Pruner Deluxe: Using database prefix: " . $db_prefix);
             
-            if ($post) {
-                $found_pages[] = array(
-                    'input' => $page_input,
-                    'post_id' => $post->ID,
-                    'post_title' => $post->post_title,
-                    'post_name' => $post->post_name,
-                    'post_type' => $post->post_type,
-                    'post_status' => $post->post_status,
-                    'post_parent' => $post->post_parent
-                );
-            } else {
-                $not_found_pages[] = array(
-                    'input' => $page_input,
-                    'reason' => 'Page not found in database'
-                );
+            foreach ($pages_array as $page_input) {
+                try {
+                    $page_input = trim($page_input);
+                    if (empty($page_input)) continue;
+                    
+                    // Clean up the input - remove leading/trailing slashes and extract slug
+                    $slug = $this->extract_slug_from_input($page_input);
+                    
+                    if (empty($slug)) {
+                        $not_found_pages[] = array(
+                            'input' => $page_input,
+                            'reason' => 'Invalid URL format'
+                        );
+                        continue;
+                    }
+                    
+                    // Log the query for debugging
+                    error_log("Site Pruner Deluxe: Looking for slug: " . $slug);
+                    
+                    // Look for the page in database (case insensitive)
+                    $query = $wpdb->prepare("
+                        SELECT ID, post_title, post_name, post_type, post_status, post_parent
+                        FROM {$wpdb->posts} 
+                        WHERE LOWER(post_name) = LOWER(%s) 
+                        AND post_status IN ('publish', 'draft', 'private', 'pending')
+                        ORDER BY post_status = 'publish' DESC
+                        LIMIT 1
+                    ", $slug);
+                    
+                    $post = $wpdb->get_row($query);
+                    
+                    // Check for database errors
+                    if ($wpdb->last_error) {
+                        error_log("Site Pruner Deluxe: Database error: " . $wpdb->last_error);
+                        $errors_encountered[] = "DB Error for '{$page_input}': " . $wpdb->last_error;
+                        continue;
+                    }
+                    
+                    if ($post) {
+                        $found_pages[] = array(
+                            'input' => $page_input,
+                            'post_id' => $post->ID,
+                            'post_title' => $post->post_title,
+                            'post_name' => $post->post_name,
+                            'post_type' => $post->post_type,
+                            'post_status' => $post->post_status,
+                            'post_parent' => $post->post_parent
+                        );
+                        error_log("Site Pruner Deluxe: Found page - ID: {$post->ID}, Title: {$post->post_title}");
+                    } else {
+                        $not_found_pages[] = array(
+                            'input' => $page_input,
+                            'reason' => 'Page not found in database'
+                        );
+                        error_log("Site Pruner Deluxe: Page not found for slug: " . $slug);
+                    }
+                    
+                } catch (Exception $e) {
+                    error_log("Site Pruner Deluxe: Error processing page '{$page_input}': " . $e->getMessage());
+                    $errors_encountered[] = "Error for '{$page_input}': " . $e->getMessage();
+                    continue;
+                }
             }
+        } catch (Exception $e) {
+            error_log("Site Pruner Deluxe: Critical error in validate_page_list: " . $e->getMessage());
+            throw $e; // Re-throw to be caught by ajax handler
         }
         
         // Generate report
@@ -157,7 +270,11 @@ class Axiom_Site_Pruner_Deluxe_Controller {
         $report .= "📊 SUMMARY:\n";
         $report .= "- Total URLs submitted: " . count($pages_array) . "\n";
         $report .= "- Pages found: " . count($found_pages) . "\n";
-        $report .= "- Pages not found: " . count($not_found_pages) . "\n\n";
+        $report .= "- Pages not found: " . count($not_found_pages) . "\n";
+        if (!empty($errors_encountered)) {
+            $report .= "- ⚠️ Errors encountered: " . count($errors_encountered) . "\n";
+        }
+        $report .= "\n";
         
         if (!empty($found_pages)) {
             $report .= "✅ FOUND PAGES:\n";
@@ -187,10 +304,26 @@ class Axiom_Site_Pruner_Deluxe_Controller {
             $report .= "\n";
         }
         
+        if (!empty($errors_encountered)) {
+            $report .= "⚠️ ERRORS ENCOUNTERED:\n";
+            foreach ($errors_encountered as $error) {
+                $report .= "- " . $error . "\n";
+            }
+            $report .= "\n";
+        }
+        
         $report .= "⚠️  PROTECTED PAGES (will never be touched):\n";
         $report .= "- Homepage\n";
         $report .= "- Pages with slugs: about, about-us, contact, contact-us, blog, aboutus, contactus\n";
         $report .= "- Parent pages required for preserved child page URLs\n\n";
+        
+        // Add debug information to the report
+        $report .= "🔍 DEBUG INFO:\n";
+        $report .= "- Database Prefix: " . $wpdb->prefix . "\n";
+        $report .= "- Home URL: " . home_url() . "\n";
+        $report .= "- Site URL: " . site_url() . "\n";
+        $report .= "- WordPress Version: " . get_bloginfo('version') . "\n";
+        $report .= "- PHP Version: " . phpversion() . "\n\n";
         
         if (count($found_pages) > 0) {
             $report .= "✅ Validation completed successfully! You can now proceed to execute pruning.";
@@ -282,11 +415,16 @@ class Axiom_Site_Pruner_Deluxe_Controller {
         // Step 5: Get all posts that should be processed (excluded preserved ones)
         $posts_to_process = $this->get_posts_to_process($preserve_post_ids);
         
-        // Step 6: Execute the action
+        // Step 6: Execute the action with detailed tracking
         $processed_count = 0;
+        $success_count = 0;
+        $error_count = 0;
+        $operation_results = array();
         $errors = array();
         
         foreach ($posts_to_process as $post) {
+            $operation_start_time = microtime(true);
+            
             if ($action === 'trash') {
                 $result = wp_trash_post($post->ID);
             } else { // draft
@@ -296,15 +434,33 @@ class Axiom_Site_Pruner_Deluxe_Controller {
                 ));
             }
             
+            $operation_time = round((microtime(true) - $operation_start_time) * 1000, 2); // in milliseconds
+            
             if ($result) {
                 $processed_count++;
+                $success_count++;
+                $status = 'SUCCESS';
             } else {
+                $processed_count++;
+                $error_count++;
+                $status = 'FAILED';
                 $errors[] = "Failed to process post ID {$post->ID} ({$post->post_title})";
             }
+            
+            // Store detailed result for each post
+            $operation_results[] = array(
+                'post_id' => $post->ID,
+                'post_title' => $post->post_title,
+                'post_type' => $post->post_type,
+                'post_status_before' => $post->post_status,
+                'action' => $action,
+                'status' => $status,
+                'time_ms' => $operation_time
+            );
         }
         
-        // Generate report
-        return $this->generate_pruning_report($preserve_post_ids, $posts_to_process, $processed_count, $errors, $action);
+        // Generate detailed report
+        return $this->generate_detailed_pruning_report($preserve_post_ids, $posts_to_process, $operation_results, $success_count, $error_count, $errors, $action);
     }
     
     /**
@@ -499,6 +655,124 @@ class Axiom_Site_Pruner_Deluxe_Controller {
         } else {
             $report .= "ℹ️ No posts were processed (all posts were preserved by protection rules).";
         }
+        
+        return $report;
+    }
+    
+    /**
+     * Generate detailed pruning report with individual post results
+     */
+    private function generate_detailed_pruning_report($preserve_post_ids, $posts_to_process, $operation_results, $success_count, $error_count, $errors, $action) {
+        global $wpdb;
+        
+        $action_text = $action === 'trash' ? 'TRASHED' : 'MOVED TO DRAFT';
+        $total_processed = count($operation_results);
+        $execution_start = date('Y-m-d H:i:s');
+        
+        // Build the detailed report
+        $report = "=== SITE PRUNER DELUXE - EXECUTION REPORT ===\n";
+        $report .= "Generated: " . $execution_start . "\n";
+        $report .= "WordPress Site: " . site_url() . "\n";
+        $report .= "=========================================\n\n";
+        
+        $report .= "📊 EXECUTION SUMMARY\n";
+        $report .= "-------------------\n";
+        $report .= "Action Type: " . strtoupper($action) . "\n";
+        $report .= "Total Posts Processed: {$total_processed}\n";
+        $report .= "✅ Successful: {$success_count}\n";
+        $report .= "❌ Failed: {$error_count}\n";
+        $report .= "🛡️ Preserved: " . count($preserve_post_ids) . "\n\n";
+        
+        // Detailed operation results
+        if (!empty($operation_results)) {
+            $report .= "📋 DETAILED OPERATION RESULTS\n";
+            $report .= "==============================\n";
+            $report .= sprintf("%-8s | %-10s | %-8s | %-50s | %-12s | %s\n", 
+                "POST ID", "POST TYPE", "STATUS", "POST TITLE", "PREV STATUS", "TIME (ms)");
+            $report .= str_repeat("-", 120) . "\n";
+            
+            foreach ($operation_results as $result) {
+                $status_symbol = $result['status'] === 'SUCCESS' ? '✅' : '❌';
+                $report .= sprintf("%-8s | %-10s | %s %-7s | %-50s | %-12s | %.2f ms\n",
+                    $result['post_id'],
+                    $result['post_type'],
+                    $status_symbol,
+                    $result['status'],
+                    substr($result['post_title'], 0, 50),
+                    $result['post_status_before'],
+                    $result['time_ms']
+                );
+            }
+            $report .= "\n";
+        }
+        
+        // List of preserved posts
+        if (count($preserve_post_ids) > 0) {
+            $report .= "🛡️ PRESERVED POSTS (NOT MODIFIED)\n";
+            $report .= "==================================\n";
+            
+            $preserved_posts = $wpdb->get_results("
+                SELECT ID, post_title, post_name, post_type, post_status
+                FROM {$wpdb->posts} 
+                WHERE ID IN (" . implode(',', array_map('intval', $preserve_post_ids)) . ")
+                ORDER BY post_type, post_title
+                LIMIT 100
+            ");
+            
+            if (!empty($preserved_posts)) {
+                $report .= sprintf("%-8s | %-10s | %-12s | %-50s\n", 
+                    "POST ID", "POST TYPE", "STATUS", "POST TITLE");
+                $report .= str_repeat("-", 90) . "\n";
+                
+                foreach ($preserved_posts as $post) {
+                    $report .= sprintf("%-8s | %-10s | %-12s | %-50s\n",
+                        $post->ID,
+                        $post->post_type,
+                        $post->post_status,
+                        substr($post->post_title, 0, 50)
+                    );
+                }
+                
+                if (count($preserve_post_ids) > 100) {
+                    $report .= "... and " . (count($preserve_post_ids) - 100) . " more preserved posts\n";
+                }
+                $report .= "\n";
+            }
+        }
+        
+        // Error details
+        if (!empty($errors)) {
+            $report .= "❌ ERROR DETAILS\n";
+            $report .= "================\n";
+            foreach ($errors as $error) {
+                $report .= "• " . $error . "\n";
+            }
+            $report .= "\n";
+        }
+        
+        // Protection rules applied
+        $report .= "🔒 PROTECTION RULES APPLIED\n";
+        $report .= "===========================\n";
+        $report .= "• Homepage was protected from changes\n";
+        $report .= "• Protected slugs: about, about-us, contact, contact-us, blog, aboutus, contactus\n";
+        $report .= "• Parent pages required for preserved child page URLs were protected\n";
+        $report .= "• User-specified preserve list was honored\n\n";
+        
+        // Final status
+        $report .= "📝 FINAL STATUS\n";
+        $report .= "===============\n";
+        if ($error_count === 0 && $total_processed > 0) {
+            $report .= "✅ All operations completed successfully!\n";
+            $report .= "Total of {$success_count} posts were {$action_text}.\n";
+        } elseif ($error_count > 0 && $success_count > 0) {
+            $report .= "⚠️ Partial success - {$success_count} succeeded, {$error_count} failed.\n";
+        } elseif ($total_processed === 0) {
+            $report .= "ℹ️ No posts were processed (all posts were preserved by protection rules).\n";
+        } else {
+            $report .= "❌ All operations failed. Please check error details above.\n";
+        }
+        
+        $report .= "\n=== END OF REPORT ===";
         
         return $report;
     }
