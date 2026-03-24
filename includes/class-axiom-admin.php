@@ -23,6 +23,9 @@ class Axiom_Admin {
         add_action('wp_ajax_axiom_icepick_validate', array($this, 'ajax_icepick_validate'));
         add_action('wp_ajax_axiom_icepick_read', array($this, 'ajax_icepick_read'));
         add_action('wp_ajax_axiom_icepick_update', array($this, 'ajax_icepick_update'));
+        
+        // Site Pruner Deluxe AJAX handlers - initialize early
+        add_action('admin_init', array($this, 'init_site_pruner_ajax'));
     }
     
     /**
@@ -310,6 +313,20 @@ class Axiom_Admin {
     }
     
     /**
+     * Initialize Site Pruner Deluxe AJAX handlers
+     */
+    public function init_site_pruner_ajax() {
+        // Load the controller class if not already loaded
+        if (!class_exists('Axiom_Site_Pruner_Deluxe_Controller')) {
+            require_once AXIOM_PLUGIN_PATH . 'site_pruner_deluxe/class-site-pruner-deluxe-controller.php';
+        }
+        
+        // Create controller instance and initialize AJAX hooks
+        $controller = new Axiom_Site_Pruner_Deluxe_Controller();
+        $controller->init_hooks();
+    }
+    
+    /**
      * Display Site Pruner Deluxe page with aggressive notice suppression
      */
     public function display_site_pruner_deluxe_page() {
@@ -317,7 +334,7 @@ class Axiom_Admin {
         require_once AXIOM_PLUGIN_PATH . 'site_pruner_deluxe/class-site-pruner-deluxe-controller.php';
         
         $controller = new Axiom_Site_Pruner_Deluxe_Controller();
-        $controller->init_hooks();
+        // Note: init_hooks() is now called in init_site_pruner_ajax() during admin_init
         $controller->render();
     }
     

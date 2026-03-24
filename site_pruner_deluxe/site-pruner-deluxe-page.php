@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Extra notice suppression at the template level
+// AGGRESSIVE NOTICE SUPPRESSION - Phase 1: Remove all admin notice actions
 add_action('admin_init', function() {
     remove_all_actions('admin_notices');
     remove_all_actions('all_admin_notices');
@@ -17,26 +17,58 @@ add_action('admin_init', function() {
     remove_all_actions('user_admin_notices');
 }, 999);
 
-// Add inline styles for the page and additional notice hiding
+// AGGRESSIVE NOTICE SUPPRESSION - Phase 2: Additional cleanup on admin_print_styles
+add_action('admin_print_styles', function() {
+    // Remove all notice actions again (some plugins add them late)
+    remove_all_actions('admin_notices');
+    remove_all_actions('all_admin_notices');
+    remove_all_actions('network_admin_notices');
+    
+    // Remove user admin notices from global filter
+    global $wp_filter;
+    if (isset($wp_filter['user_admin_notices'])) {
+        unset($wp_filter['user_admin_notices']);
+    }
+}, 0);
+
+// AGGRESSIVE NOTICE SUPPRESSION - Phase 3: CSS-based notice hiding and custom styles
 add_action('admin_head', function() {
-    echo <<<'STYLES'
+    // Add cache-busting version comment to force browser refresh
+    $version = time(); // Use timestamp for aggressive cache busting
+    echo <<<STYLES
 <style>
-        /* Aggressive notice hiding for Site Pruner Deluxe */
-        .wrap > .notice,
-        .wrap > .notice-error,
-        .wrap > .notice-warning,
-        .wrap > .notice-success,
-        .wrap > .notice-info,
-        .wrap > .update-nag,
-        .wrap > .updated,
-        .wrap > .error,
+/* Site Pruner Deluxe Styles - Version: $version */
+        /* ULTRA-AGGRESSIVE notice hiding for Site Pruner Deluxe */
+        .notice, .notice-warning, .notice-error, .notice-success, .notice-info,
+        .updated, .error, .update-nag, .admin-notice,
+        div.notice, div.updated, div.error, div.update-nag,
+        .wrap > .notice, .wrap > .updated, .wrap > .error,
         #wpbody-content > .notice,
         #wpbody-content > .updated,
         #wpbody-content > .error,
         #wpbody-content > .update-nag,
+        #adminmenu + .notice, #adminmenu + .updated, #adminmenu + .error,
+        .update-php, .php-update-nag,
+        .plugin-update-tr, .theme-update-message,
+        .update-message, .updating-message,
+        #update-nag, #deprecation-warning,
         .wp-header-end + .notice,
         .wp-header-end + .updated,
-        .wp-header-end + .error {
+        .wp-header-end + .error,
+        /* WordPress core update notices */
+        .update-core-php, .notice-alt,
+        /* Plugin activation/deactivation notices */
+        .activated, .deactivated,
+        /* Gutenberg/Block editor notices */
+        .edit-post-header .components-notice-list,
+        .edit-post-layout .components-notice,
+        .edit-post-sidebar .components-notice,
+        .components-snackbar-list,
+        .components-notice-list .components-notice,
+        .interface-interface-skeleton__notices,
+        .edit-post-notices,
+        .block-editor-warning,
+        .components-notice.is-warning {
             display: none !important;
             visibility: hidden !important;
             height: 0 !important;
@@ -96,8 +128,11 @@ add_action('admin_head', function() {
         }
         
         .pruner-textarea {
-            width: 500px;
-            height: 500px;
+            width: 500px !important;
+            height: 500px !important;
+            min-width: 500px !important;
+            min-height: 500px !important;
+            max-width: 500px !important;
             padding: 15px;
             border: 2px solid #ddd;
             border-radius: 6px;
@@ -260,7 +295,15 @@ https://dogs.com/bananas-now"></textarea>
             <button id="validate-pages" class="pruner-button success">Validate Pages</button>
             <span id="validate-spinner" class="spinner"></span>
             
-            <div id="validation-results" class="pruner-results" style="display: none;"></div>
+            <div id="validation-results-container" style="display: none; margin-top: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h4 style="margin: 0; color: #333;">📋 Validation Results</h4>
+                    <button id="copy-validation-results" class="pruner-button small" type="button">
+                        📋 Copy Results
+                    </button>
+                </div>
+                <textarea id="validation-results" class="pruner-textarea" style="width: 100% !important; height: 500px !important; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 13px; background: #f9f9f9;" readonly></textarea>
+            </div>
         </div>
         
         <!-- PART 2: Pruning Action Selection -->
@@ -337,6 +380,16 @@ https://dogs.com/bananas-now"></textarea>
             });
         });
         
+        // Copy validation results function
+        $('#copy-validation-results').on('click', function() {
+            var validationText = $('#validation-results').val();
+            navigator.clipboard.writeText(validationText).then(function() {
+                alert('Validation results copied to clipboard!');
+            }).catch(function(err) {
+                alert('Failed to copy: ' + err);
+            });
+        });
+        
         // Validate Pages functionality
         $('#validate-pages').on('click', function() {
             var pagesToPreserve = $('#pages-to-preserve').val().trim();
@@ -348,7 +401,8 @@ https://dogs.com/bananas-now"></textarea>
             
             $('#validate-spinner').show();
             $('#validate-pages').prop('disabled', true);
-            $('#validation-results').hide().empty();
+            $('#validation-results-container').hide();
+            $('#validation-results').val('');
             $('#debug-panel').hide();
             
             // Clear previous debug info
@@ -386,7 +440,8 @@ https://dogs.com/bananas-now"></textarea>
                     lastDebugInfo.responseHeaders = jqXHR.getAllResponseHeaders();
                     
                     if (response && response.data) {
-                        $('#validation-results').show().text(response.data);
+                        $('#validation-results').val(response.data);
+                        $('#validation-results-container').show();
                         
                         if (response.success) {
                             validationPassed = true;
@@ -396,7 +451,8 @@ https://dogs.com/bananas-now"></textarea>
                             showDebugInfo('Validation failed with success=false');
                         }
                     } else {
-                        $('#validation-results').show().text('Invalid response format from server.');
+                        $('#validation-results').val('Invalid response format from server.');
+                        $('#validation-results-container').show();
                         showDebugInfo('Invalid response format');
                     }
                 },
@@ -447,10 +503,11 @@ https://dogs.com/bananas-now"></textarea>
                         lastDebugInfo.diagnosis = 'Redirect detected - user might not be logged in';
                     }
                     
-                    $('#validation-results').show().html(
-                        '<span style="color: red;">' + errorMessage + '</span><br>' +
-                        '<small>Click "Show Debug Info" below for details</small>'
+                    $('#validation-results').val(
+                        errorMessage + '\n\n' +
+                        'See debug information below for details.'
                     );
+                    $('#validation-results-container').show();
                     
                     showDebugInfo('AJAX request failed');
                 }
@@ -574,7 +631,7 @@ https://dogs.com/bananas-now"></textarea>
         $('#pages-to-preserve').on('input', function() {
             validationPassed = false;
             $('#execute-pruning').prop('disabled', true);
-            $('#validation-results').hide();
+            $('#validation-results-container').hide();
             $('#execution-results').hide();
         });
         

@@ -216,17 +216,53 @@ class Axiom_Site_Pruner_Deluxe_Controller {
                     // Log the query for debugging
                     error_log("Site Pruner Deluxe: Looking for slug: " . $slug);
                     
-                    // Look for the page in database (case insensitive)
-                    $query = $wpdb->prepare("
-                        SELECT ID, post_title, post_name, post_type, post_status, post_parent
-                        FROM {$wpdb->posts} 
-                        WHERE LOWER(post_name) = LOWER(%s) 
-                        AND post_status IN ('publish', 'draft', 'private', 'pending')
-                        ORDER BY post_status = 'publish' DESC
-                        LIMIT 1
-                    ", $slug);
-                    
-                    $post = $wpdb->get_row($query);
+                    // Special handling for homepage
+                    if ($slug === '__homepage__') {
+                        // Get the homepage
+                        $front_page_id = get_option('page_on_front');
+                        if ($front_page_id) {
+                            $post = get_post($front_page_id);
+                        } else {
+                            // No static homepage set, mark as not found
+                            $not_found_pages[] = array(
+                                'input' => $page_input,
+                                'reason' => 'Homepage (no static front page set)'
+                            );
+                            continue;
+                        }
+                    } else {
+                        // First try with the hierarchical slug (with ___)
+                        $search_slug = str_replace('___', '/', $slug);
+                        
+                        // Look for the page in database (case insensitive)
+                        $query = $wpdb->prepare("
+                            SELECT ID, post_title, post_name, post_type, post_status, post_parent
+                            FROM {$wpdb->posts} 
+                            WHERE LOWER(post_name) = LOWER(%s) 
+                            AND post_status IN ('publish', 'draft', 'private', 'pending')
+                            ORDER BY post_status = 'publish' DESC
+                            LIMIT 1
+                        ", $search_slug);
+                        
+                        $post = $wpdb->get_row($query);
+                        
+                        // If not found, try just the last segment (for non-hierarchical pages)
+                        if (!$post && strpos($search_slug, '/') !== false) {
+                            $parts = explode('/', $search_slug);
+                            $last_segment = end($parts);
+                            
+                            $query = $wpdb->prepare("
+                                SELECT ID, post_title, post_name, post_type, post_status, post_parent
+                                FROM {$wpdb->posts} 
+                                WHERE LOWER(post_name) = LOWER(%s) 
+                                AND post_status IN ('publish', 'draft', 'private', 'pending')
+                                ORDER BY post_status = 'publish' DESC
+                                LIMIT 1
+                            ", $last_segment);
+                            
+                            $post = $wpdb->get_row($query);
+                        }
+                    }
                     
                     // Check for database errors
                     if ($wpdb->last_error) {
@@ -278,20 +314,17 @@ class Axiom_Site_Pruner_Deluxe_Controller {
         
         if (!empty($found_pages)) {
             $report .= "✅ FOUND PAGES:\n";
-            $report .= str_repeat("-", 80) . "\n";
-            $report .= sprintf("%-30s %-8s %-20s %-12s %-10s %s\n", 
-                "INPUT", "POST_ID", "POST_TYPE", "POST_STATUS", "PARENT", "TITLE");
-            $report .= str_repeat("-", 80) . "\n";
+            $report .= str_repeat("-", 120) . "\n";
             
             foreach ($found_pages as $page) {
-                $report .= sprintf("%-30s %-8s %-20s %-12s %-10s %s\n",
-                    substr($page['input'], 0, 29),
-                    $page['post_id'],
-                    $page['post_type'],
-                    $page['post_status'],
-                    $page['post_parent'] ?: 'None',
-                    substr($page['post_title'], 0, 30)
-                );
+                $report .= "INPUT: " . $page['input'] . "\n";
+                $report .= "  → Post ID: " . $page['post_id'] . "\n";
+                $report .= "  → Title: " . $page['post_title'] . "\n";
+                $report .= "  → Type: " . $page['post_type'] . "\n";
+                $report .= "  → Status: " . $page['post_status'] . "\n";
+                $report .= "  → Parent: " . ($page['post_parent'] ?: 'None') . "\n";
+                $report .= "  → Slug: " . $page['post_name'] . "\n";
+                $report .= str_repeat("-", 80) . "\n";
             }
             $report .= "\n";
         }
@@ -343,23 +376,32 @@ class Axiom_Site_Pruner_Deluxe_Controller {
         // If it's a full URL, extract the path
         if (strpos($input, 'http') === 0) {
             $parsed = parse_url($input);
-            if (!isset($parsed['path'])) return '';
+            
+            // Check if this is the homepage (no path or just '/')
+            if (!isset($parsed['path']) || $parsed['path'] === '/' || $parsed['path'] === '') {
+                return '__homepage__'; // Special marker for homepage
+            }
+            
             $input = $parsed['path'];
         }
         
         // Remove leading and trailing slashes
         $input = trim($input, '/');
         
-        // If it contains multiple path segments, take the last one
-        if (strpos($input, '/') !== false) {
-            $parts = explode('/', $input);
-            $input = end($parts);
+        // If empty after trimming (homepage), return special marker
+        if (empty($input)) {
+            return '__homepage__';
         }
         
-        // Clean the slug
-        $input = sanitize_title($input);
+        // For paths with multiple segments, we want the full path as slug
+        // Don't take just the last segment - keep the full path
+        // WordPress stores the full path as post_name for hierarchical pages
         
-        return $input;
+        // Clean the slug but preserve the path structure
+        // Replace slashes with a unique marker to preserve hierarchy
+        $slug = str_replace('/', '___', $input);
+        
+        return $slug;
     }
     
     /**
