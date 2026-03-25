@@ -182,9 +182,25 @@ class Axiom_Site_Pruner_Deluxe_Controller {
         global $wpdb;
         
         try {
+            // Remove duplicates from input array (case-insensitive)
+            $processed_urls = array();
+            $unique_pages_array = array();
+            $duplicate_count = 0;
+            
+            foreach ($pages_array as $page_input) {
+                $normalized = strtolower(trim($page_input));
+                if (!in_array($normalized, $processed_urls)) {
+                    $processed_urls[] = $normalized;
+                    $unique_pages_array[] = $page_input;
+                } else {
+                    $duplicate_count++;
+                }
+            }
+            
             $found_pages = array();
             $not_found_pages = array();
             $errors_encountered = array();
+            $already_found_ids = array(); // Track post IDs we've already found
             $home_url = home_url();
             $site_url = site_url();
             
@@ -197,7 +213,7 @@ class Axiom_Site_Pruner_Deluxe_Controller {
             $db_prefix = $wpdb->prefix;
             error_log("Site Pruner Deluxe: Using database prefix: " . $db_prefix);
             
-            foreach ($pages_array as $page_input) {
+            foreach ($unique_pages_array as $page_input) {
                 try {
                     $page_input = trim($page_input);
                     if (empty($page_input)) continue;
@@ -272,16 +288,23 @@ class Axiom_Site_Pruner_Deluxe_Controller {
                     }
                     
                     if ($post) {
-                        $found_pages[] = array(
-                            'input' => $page_input,
-                            'post_id' => $post->ID,
-                            'post_title' => $post->post_title,
-                            'post_name' => $post->post_name,
-                            'post_type' => $post->post_type,
-                            'post_status' => $post->post_status,
-                            'post_parent' => $post->post_parent
-                        );
-                        error_log("Site Pruner Deluxe: Found page - ID: {$post->ID}, Title: {$post->post_title}");
+                        // Check if we've already found this post ID (different URLs might point to same page)
+                        if (!in_array($post->ID, $already_found_ids)) {
+                            $found_pages[] = array(
+                                'input' => $page_input,
+                                'post_id' => $post->ID,
+                                'post_title' => $post->post_title,
+                                'post_name' => $post->post_name,
+                                'post_type' => $post->post_type,
+                                'post_status' => $post->post_status,
+                                'post_parent' => $post->post_parent
+                            );
+                            $already_found_ids[] = $post->ID;
+                            error_log("Site Pruner Deluxe: Found page - ID: {$post->ID}, Title: {$post->post_title}");
+                        } else {
+                            // This post ID was already found via a different URL
+                            error_log("Site Pruner Deluxe: Skipping duplicate - Post ID {$post->ID} already found via different URL");
+                        }
                     } else {
                         $not_found_pages[] = array(
                             'input' => $page_input,
@@ -305,6 +328,10 @@ class Axiom_Site_Pruner_Deluxe_Controller {
         $report = "=== PAGE VALIDATION RESULTS ===\n\n";
         $report .= "📊 SUMMARY:\n";
         $report .= "- Total URLs submitted: " . count($pages_array) . "\n";
+        if ($duplicate_count > 0) {
+            $report .= "- Duplicate URLs removed: " . $duplicate_count . "\n";
+            $report .= "- Unique URLs processed: " . count($unique_pages_array) . "\n";
+        }
         $report .= "- Pages found: " . count($found_pages) . "\n";
         $report .= "- Pages not found: " . count($not_found_pages) . "\n";
         if (!empty($errors_encountered)) {
@@ -409,29 +436,52 @@ class Axiom_Site_Pruner_Deluxe_Controller {
      * Executes the pruning function based on user settings
      */
     public function ajax_execute_pruning() {
-        // Security check
-        check_ajax_referer('site_pruner_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error('Insufficient permissions');
+        try {
+            // Security check
+            check_ajax_referer('site_pruner_nonce', 'nonce');
+            
+            if (!current_user_can('manage_options')) {
+                wp_send_json_error('Insufficient permissions');
+                return;
+            }
+            
+            $pages_list = sanitize_textarea_field($_POST['pages_list']);
+            $pruning_action = sanitize_text_field($_POST['pruning_action']);
+            
+            if (!in_array($pruning_action, array('trash', 'draft'))) {
+                wp_send_json_error('Invalid pruning action');
+                return;
+            }
+            
+            $pages_array = array_filter(array_map('trim', explode("\n", $pages_list)));
+            
+            if (empty($pages_array)) {
+                wp_send_json_error('No pages provided for pruning');
+                return;
+            }
+            
+            // Log execution attempt
+            error_log('Site Pruner Deluxe: Starting execution with action: ' . $pruning_action);
+            error_log('Site Pruner Deluxe: Processing ' . count($pages_array) . ' pages to preserve');
+            
+            $results = $this->execute_pruning_function($pages_array, $pruning_action);
+            
+            // Log result
+            error_log('Site Pruner Deluxe: Execution completed. Report length: ' . strlen($results));
+            
+            // Ensure we have a valid report
+            if (empty($results)) {
+                $results = "ERROR: Execution completed but no report was generated.\n";
+                $results .= "This may indicate an issue with the pruning function.\n";
+                $results .= "Please check the error logs for more information.";
+            }
+            
+            wp_send_json_success($results);
+            
+        } catch (Exception $e) {
+            error_log('Site Pruner Deluxe Exception in ajax_execute_pruning: ' . $e->getMessage());
+            wp_send_json_error('Exception occurred: ' . $e->getMessage());
         }
-        
-        $pages_list = sanitize_textarea_field($_POST['pages_list']);
-        $pruning_action = sanitize_text_field($_POST['pruning_action']);
-        
-        if (!in_array($pruning_action, array('trash', 'draft'))) {
-            wp_send_json_error('Invalid pruning action');
-        }
-        
-        $pages_array = array_filter(array_map('trim', explode("\n", $pages_list)));
-        
-        if (empty($pages_array)) {
-            wp_send_json_error('No pages provided for pruning');
-        }
-        
-        $results = $this->execute_pruning_function($pages_array, $pruning_action);
-        
-        wp_send_json_success($results);
     }
     
     /**
@@ -440,22 +490,43 @@ class Axiom_Site_Pruner_Deluxe_Controller {
     private function execute_pruning_function($pages_array, $action) {
         global $wpdb;
         
-        // Step 1: Build preserve list from user input
-        $preserve_post_ids = $this->get_preserve_post_ids($pages_array);
+        // Remove duplicates from input array first (case-insensitive)
+        $processed_urls = array();
+        $unique_pages_array = array();
+        foreach ($pages_array as $page_input) {
+            $normalized = strtolower(trim($page_input));
+            if (!in_array($normalized, $processed_urls)) {
+                $processed_urls[] = $normalized;
+                $unique_pages_array[] = $page_input;
+            }
+        }
+        
+        error_log('Site Pruner Deluxe: execute_pruning_function started');
+        error_log('Site Pruner Deluxe: Action = ' . $action);
+        error_log('Site Pruner Deluxe: Original pages submitted = ' . count($pages_array));
+        error_log('Site Pruner Deluxe: Unique pages to preserve = ' . count($unique_pages_array));
+        
+        // Step 1: Build preserve list from user input (using deduplicated array)
+        $preserve_post_ids = $this->get_preserve_post_ids($unique_pages_array);
+        error_log('Site Pruner Deluxe: User preserve IDs found = ' . count($preserve_post_ids));
         
         // Step 2: Add hardcoded protected pages
         $protected_post_ids = $this->get_protected_post_ids();
+        error_log('Site Pruner Deluxe: Protected IDs found = ' . count($protected_post_ids));
         $preserve_post_ids = array_merge($preserve_post_ids, $protected_post_ids);
         
         // Step 3: Add parent pages that are required for preserved child pages
         $required_parent_ids = $this->get_required_parent_post_ids($preserve_post_ids);
+        error_log('Site Pruner Deluxe: Required parent IDs found = ' . count($required_parent_ids));
         $preserve_post_ids = array_merge($preserve_post_ids, $required_parent_ids);
         
         // Step 4: Remove duplicates
         $preserve_post_ids = array_unique($preserve_post_ids);
+        error_log('Site Pruner Deluxe: Total preserve IDs after dedup = ' . count($preserve_post_ids));
         
         // Step 5: Get all posts that should be processed (excluded preserved ones)
         $posts_to_process = $this->get_posts_to_process($preserve_post_ids);
+        error_log('Site Pruner Deluxe: Posts to process = ' . count($posts_to_process));
         
         // Step 6: Execute the action with detailed tracking
         $processed_count = 0;
@@ -501,8 +572,23 @@ class Axiom_Site_Pruner_Deluxe_Controller {
             );
         }
         
+        error_log('Site Pruner Deluxe: Processing complete. Success=' . $success_count . ', Errors=' . $error_count);
+        
         // Generate detailed report
-        return $this->generate_detailed_pruning_report($preserve_post_ids, $posts_to_process, $operation_results, $success_count, $error_count, $errors, $action);
+        $report = $this->generate_detailed_pruning_report($preserve_post_ids, $posts_to_process, $operation_results, $success_count, $error_count, $errors, $action);
+        
+        error_log('Site Pruner Deluxe: Report generated, length = ' . strlen($report));
+        
+        // If report is empty, generate a fallback
+        if (empty($report)) {
+            $report = "ERROR: Report generation failed.\n";
+            $report .= "Posts to process: " . count($posts_to_process) . "\n";
+            $report .= "Success count: " . $success_count . "\n";
+            $report .= "Error count: " . $error_count . "\n";
+            $report .= "Preserved IDs: " . count($preserve_post_ids) . "\n";
+        }
+        
+        return $report;
     }
     
     /**
@@ -517,6 +603,19 @@ class Axiom_Site_Pruner_Deluxe_Controller {
             $slug = $this->extract_slug_from_input($page_input);
             if (empty($slug)) continue;
             
+            // Handle homepage specially
+            if ($slug === '__homepage__') {
+                $front_page_id = get_option('page_on_front');
+                if ($front_page_id) {
+                    $post_ids[] = $front_page_id;
+                }
+                continue;
+            }
+            
+            // Convert back the hierarchical marker to slashes for searching
+            $search_slug = str_replace('___', '/', $slug);
+            
+            // First try exact match
             $post = $wpdb->get_row($wpdb->prepare("
                 SELECT ID
                 FROM {$wpdb->posts} 
@@ -524,12 +623,38 @@ class Axiom_Site_Pruner_Deluxe_Controller {
                 AND post_status IN ('publish', 'draft', 'private', 'pending')
                 ORDER BY post_status = 'publish' DESC
                 LIMIT 1
-            ", $slug));
+            ", $search_slug));
+            
+            // If not found and has hierarchy, try just the last segment
+            if (!$post && strpos($search_slug, '/') !== false) {
+                $parts = explode('/', $search_slug);
+                $last_segment = end($parts);
+                
+                $post = $wpdb->get_row($wpdb->prepare("
+                    SELECT ID
+                    FROM {$wpdb->posts} 
+                    WHERE LOWER(post_name) = LOWER(%s) 
+                    AND post_status IN ('publish', 'draft', 'private', 'pending')
+                    ORDER BY post_status = 'publish' DESC
+                    LIMIT 1
+                ", $last_segment));
+            }
             
             if ($post) {
-                $post_ids[] = $post->ID;
+                // Check if we already have this ID (prevent duplicates)
+                if (!in_array($post->ID, $post_ids)) {
+                    $post_ids[] = $post->ID;
+                    error_log('Site Pruner Deluxe: Found preserve ID ' . $post->ID . ' for input: ' . $page_input);
+                } else {
+                    error_log('Site Pruner Deluxe: Duplicate preserve ID ' . $post->ID . ' skipped for input: ' . $page_input);
+                }
+            } else {
+                error_log('Site Pruner Deluxe: Could not find ID for input: ' . $page_input . ' (slug: ' . $search_slug . ')');
             }
         }
+        
+        // Final safety check - ensure no duplicate IDs
+        $post_ids = array_unique($post_ids);
         
         return $post_ids;
     }

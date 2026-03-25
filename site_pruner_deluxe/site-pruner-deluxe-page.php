@@ -350,7 +350,7 @@ https://dogs.com/bananas-now"></textarea>
                         📋 Copy Report
                     </button>
                 </div>
-                <div id="execution-results" class="pruner-results"></div>
+                <textarea id="execution-results" class="pruner-textarea" style="width: 100% !important; height: 500px !important; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 13px; background: #f9f9f9;" readonly></textarea>
             </div>
         </div>
         
@@ -555,7 +555,7 @@ https://dogs.com/bananas-now"></textarea>
         
         // Copy execution report functionality
         $('#copy-execution-report').on('click', function() {
-            var reportText = $('#execution-results').text();
+            var reportText = $('#execution-results').val();
             navigator.clipboard.writeText(reportText).then(function() {
                 alert('Execution report copied to clipboard!');
             }).catch(function(err) {
@@ -580,7 +580,7 @@ https://dogs.com/bananas-now"></textarea>
             $('#execute-spinner').show();
             $('#execute-pruning').prop('disabled', true);
             $('#execution-results-container').hide();
-            $('#execution-results').empty();
+            $('#execution-results').val('');
             
             console.log('Executing pruning with action:', pruningAction);
             
@@ -599,12 +599,23 @@ https://dogs.com/bananas-now"></textarea>
                     $('#execute-pruning').prop('disabled', false);
                     
                     console.log('Execution response:', response);
+                    console.log('Response type:', typeof response);
+                    console.log('Response.data:', response.data);
+                    console.log('Response.data type:', typeof response.data);
+                    console.log('Response.data length:', response.data ? response.data.length : 'N/A');
                     
                     if (response && response.data) {
-                        $('#execution-results').text(response.data);
+                        console.log('Setting execution results to:', response.data);
+                        $('#execution-results').val(response.data);
                         $('#execution-results-container').show();
+                        
+                        // Double-check the value was set
+                        var setValue = $('#execution-results').val();
+                        console.log('Value actually set in textarea:', setValue);
+                        console.log('Textarea element exists:', $('#execution-results').length > 0);
                     } else {
-                        $('#execution-results').text('Invalid response format from server.');
+                        console.log('Invalid response - setting error message');
+                        $('#execution-results').val('Invalid response format from server.');
                         $('#execution-results-container').show();
                     }
                 },
@@ -621,7 +632,7 @@ https://dogs.com/bananas-now"></textarea>
                         errorMessage += 'Response: ' + jqXHR.responseText;
                     }
                     
-                    $('#execution-results').text(errorMessage);
+                    $('#execution-results').val(errorMessage);
                     $('#execution-results-container').show();
                 }
             });
