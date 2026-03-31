@@ -7,54 +7,66 @@
 if (!defined('ABSPATH')) {
     exit;
 }
+
+// AGGRESSIVE NOTICE SUPPRESSION - Remove ALL WordPress admin notices
+remove_all_actions('admin_notices');
+remove_all_actions('all_admin_notices');
+remove_all_actions('network_admin_notices');
+remove_all_actions('user_admin_notices');
+
+// Add CSS to hide any notices that might still appear
+add_action('admin_head', function() {
+    ?>
+    <style type="text/css">
+        /* Hide all types of WordPress admin notices */
+        .notice,
+        .notice-error,
+        .notice-warning,
+        .notice-info,
+        .notice-success,
+        .updated,
+        .update-nag,
+        .error,
+        div.notice,
+        div.updated,
+        div.error,
+        #message,
+        .wrap > .notice,
+        .wrap > .updated,
+        .wrap > .error {
+            display: none !important;
+        }
+    </style>
+    <?php
+});
+
+// Add JavaScript to remove any notices from DOM
+add_action('admin_footer', function() {
+    ?>
+    <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            // Remove all notice elements
+            $('.notice, .notice-error, .notice-warning, .notice-info, .notice-success, .updated, .update-nag, .error, #message').remove();
+            
+            // Observer to remove any dynamically added notices
+            var observer = new MutationObserver(function(mutations) {
+                $('.notice, .notice-error, .notice-warning, .notice-info, .notice-success, .updated, .update-nag, .error, #message').remove();
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        });
+    </script>
+    <?php
+});
 ?>
 
 <div class="wrap">
     <h1>⚡ Axiom Plunger - Direct Schema Editor</h1>
-    
-    <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; margin: 20px 0; border-radius: 5px;">
-        <h3 style="color: #856404; margin-top: 0;">⚠️ WARNING - DANGEROUS TOOL</h3>
-        <p style="color: #856404; margin-bottom: 0;">
-            This tool executes SQL directly on your database. <strong>Use with extreme caution.</strong><br>
-            Only the following operations are allowed for safety:
-        </p>
-        <ul style="color: #856404;">
-            <li><code>ALTER TABLE [table] ADD/DROP COLUMN [column] [type]</code> - Modify table structure</li>
-            <li><code>ALTER TABLE [table] ADD INDEX/KEY [name] ([column])</code> - Add indexes</li>
-            <li><code>CREATE TABLE [table] (...)</code> - Create new tables</li>
-            <li><code>DROP TABLE [table]</code> - Drop tables (DANGER!)</li>
-            <li><code>CREATE INDEX [name] ON [table] ([column])</code> - Create indexes</li>
-            <li><code>INSERT INTO [table] ([columns]) VALUES ([values])</code> - Insert data</li>
-            <li><code>REPLACE INTO [table] ([columns]) VALUES ([values])</code> - Replace data</li>
-            <li><code>UPDATE [table] SET [column=value] WHERE [condition]</code> - Update data</li>
-            <li><code>DELETE FROM [table] WHERE [condition]</code> - Delete data</li>
-            <li><code>SELECT [columns] FROM [table] WHERE [condition]</code> - Query data</li>
-            <li><code>SHOW COLUMNS/TABLES, DESCRIBE [table]</code> - View structure</li>
-        </ul>
-    </div>
 
     <div style="background: white; padding: 20px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 20px;">
         <h2>Database Information</h2>
         <p><strong>Database Name:</strong> <?php echo DB_NAME; ?></p>
         <p><strong>Table Prefix:</strong> <?php global $wpdb; echo $wpdb->prefix; ?></p>
         <p><strong>Current User:</strong> <?php echo wp_get_current_user()->user_login; ?> (ID: <?php echo get_current_user_id(); ?>)</p>
-    </div>
-
-    <!-- Quick Commands Section -->
-    <div style="background: white; padding: 20px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 20px;">
-        <h2>Quick Commands</h2>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-            <div>
-                <h4>View Table Structure</h4>
-                <button class="button quick-sql" data-sql="SHOW COLUMNS FROM <?php echo $wpdb->prefix; ?>zen_services">Show zen_services columns</button>
-                <button class="button quick-sql" data-sql="DESCRIBE <?php echo $wpdb->prefix; ?>zen_services">Describe zen_services</button>
-            </div>
-            <div>
-                <h4>Common Operations</h4>
-                <button class="button quick-sql" data-sql="SHOW TABLES LIKE '%zen%'">Show all zen tables</button>
-                <button class="button quick-sql" data-sql="SHOW COLUMNS FROM <?php echo $wpdb->prefix; ?>zen_sitespren">Show zen_sitespren columns</button>
-            </div>
-        </div>
     </div>
 
     <!-- SQL Editor -->
