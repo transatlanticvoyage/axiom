@@ -10,6 +10,7 @@
 
 // Test comment to verify VSCode source control detection for axiom plugin
 // Test comment: VSCode source control pane test - 2026-03-20
+// Test comment: VSCode source control sync test - 2026-05-28
 
 // Prevent direct access
 if (!defined('ABSPATH')) {
