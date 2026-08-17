@@ -63,7 +63,13 @@ class Axiom_DB_Discrepancy_Ajax_Handler {
         
         // Track start time
         $start_time = microtime(true);
-        
+
+        // Remember whether wpdb was showing errors before we start suppressing them, so it can
+        // be put back exactly as it was. Calling show_errors() with no argument forces display
+        // ON regardless of WP_DEBUG, which would let any later failed query in this request
+        // echo raw SQL into the JSON response and corrupt the payload.
+        $previous_show_errors = $wpdb->show_errors;
+
         foreach ($statements as $index => $statement) {
             if (empty($statement)) {
                 continue;
@@ -130,7 +136,7 @@ class Axiom_DB_Discrepancy_Ajax_Handler {
             }
         }
         
-        $wpdb->show_errors(); // Re-enable error display
+        $wpdb->show_errors($previous_show_errors); // Restore the prior setting, don't force it on
         
         // Calculate execution time
         $execution_time = round(microtime(true) - $start_time, 3);
